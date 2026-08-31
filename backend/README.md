@@ -48,6 +48,10 @@ uv run python -m scripts.fetch_wikichess    # télécharge les articles Wikiches
 uv run python -m scripts.ingest_wikichess   # les indexe dans Milvus
 ```
 
+Les articles téléchargés sont versionnés avec le projet : la première commande
+n'est à rejouer que pour rafraîchir le corpus.
+
+
 ## Contrôles qualité
 
 | Outil | Commande |
