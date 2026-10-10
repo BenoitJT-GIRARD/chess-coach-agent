@@ -69,6 +69,20 @@ question, plausibly, and scores a third of what `docs/protocol.md` publishes. Th
 reads the manifest, sees that none of the articles it lists is on disk, and names the command
 that fetches them.
 
+## Getting the keys back
+
+Each key is personal and is created in a minute; none of them is shared with the repository.
+
+| Key | Issuer | Creating one |
+|---|---|---|
+| `LICHESS_TOKEN` | Lichess | [lichess.org/account/oauth/token/create](https://lichess.org/account/oauth/token/create), with no scope ticked: the Explorer only needs to know who asks |
+| `YOUTUBE_API_KEY` | Google Cloud | in a project of your own, enable *YouTube Data API v3*, then *Credentials*, *Create credentials*, *API key*, restricted to that API |
+| `LLM_API_KEY` | OpenAI, or any OpenAI-compatible provider | [platform.openai.com/api-keys](https://platform.openai.com/api-keys), a project key; the account needs credit on its balance |
+
+All three go in `.env` at the root, copied from `.env.example`, which `docker compose` hands
+to the API container. Once the demonstration is over, delete each one on the page that
+created it: an idle key that still opens an account is a risk for nothing.
+
 ## When something stops answering
 
 **A search that hangs.** Look at `docker compose logs milvus`. A call to the vector store is
