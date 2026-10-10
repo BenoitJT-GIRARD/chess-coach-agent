@@ -109,7 +109,7 @@ should come back. Four wordings, same corpus, same index:
 | **`french-question`**, what the agent sends | **0.86** | **1.00** | **0.929** |
 | `english-verbose` (a padded English wording) | 0.50 | 0.86 | 0.693 |
 | `name-and-eco` (the name plus its ECO code) | 0.93 | 0.93 | 0.946 |
-n = 14 cases, each with a hard label and no judge.
+> n = 14 cases, each with a hard label and no judge.
 
 > **How to read it.** Each row is one wording of the same question, put to the same corpus and
 > index; `name-and-eco` appends the position's ECO (Encyclopaedia of Chess Openings) code.
@@ -159,7 +159,7 @@ first set. Here is what it does across a frozen reading of 54 positions:
 | 5000 | 45 | 0 |
 | 10000 | 41 | 4 |
 | 25000 | 28 | 13 |
-n = 54 positions, read from the `masters` database on 2026-09-07.
+> n = 54 positions, read from the `masters` database on 2026-09-07.
 
 > **How to read it.** Each row is one candidate value for `theory_min_games`, the number of
 > master games above which a position counts as theory. `in_theory` is how many of the 54 frozen
@@ -197,8 +197,8 @@ Measured inside the deployed configuration, four positions, three repeats:
 | `theory` (the Lichess Explorer call) | 76.2 | 80.4 |
 | `videos` (the YouTube Data API call) | 276.1 | 312.4 |
 | `engine` (the Stockfish call) | 346.1 | 392.1 |
-n = 12 timings per node, 6 for the engine, which runs only on positions that left theory.
-The engine is called at the depth `STOCKFISH_DEPTH` sets, fifteen plies in this configuration.
+> n = 12 timings per node, 6 for the engine, which runs only on positions that left theory.
+> The engine is called at the depth `STOCKFISH_DEPTH` sets, fifteen plies in this configuration.
 
 > **How to read it.** One row per node of the agent's graph, timed inside the deployed
 > configuration. `median_ms` is the usual wait in milliseconds, the value half the calls beat.
@@ -235,7 +235,7 @@ One line of the prompt forbids inventing a move. Twenty-one positions were put t
 | The opening's own line, quoted behind its move number | 45 |
 | Legal in the position, not given by any tool | 1 |
 | No such move in the position | 2 |
-n = 116 cited moves, over 21 positions answered twice.
+> n = 116 cited moves, over 21 positions answered twice.
 
 > **How to read it.** Each row is one origin a cited move can have, and `citations` counts the
 > moves that fall into it. The first two rows are moves a tool supplied or the opening's own
