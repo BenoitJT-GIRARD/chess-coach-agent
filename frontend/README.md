@@ -15,6 +15,12 @@ Two public bricks, and the attribution matters more than the line count:
 - **[Angular Material](https://material.angular.io/)**: toolbar, cards, buttons, chips,
   tooltips and the loading indicator.
 
+The board is also what holds the framework at Angular 17. `npm audit` lists four advisories
+against Angular itself, fixed in Angular 20 only, and ngx-chess-board declares Angular 17 as
+its peer. Moving would mean replacing the board. The interface runs on the machine that runs
+the API and is not deployed anywhere, which is why it stays where it is for now. The build
+tools' remaining advisories have the same cause: their fixes ship with Angular's next majors.
+
 The Material theme is built on a navy and a gold (`src/styles.scss`). The icon font is
 bundled through the `material-icons` package rather than loaded from Google Fonts, so the
 interface stays usable with no internet access, which is also what a demonstration on a
