@@ -6,7 +6,7 @@ time. The videos are a search API. The engine computes its answer, so it holds n
 all.
 
 This page says what each one is, what its terms allow, and which of them this repository is
-allowed to redistribute. The short answer is: one of the four, and it is the one written here.
+allowed to redistribute. Of the four, the only one it may redistribute is the one written here.
 
 ## The knowledge base
 
@@ -21,9 +21,10 @@ allowed to redistribute. The short answer is: one of the four, and it is the one
 | Index | [`backend/reports/wikichess_manifest.json`](../backend/reports/wikichess_manifest.json) |
 | Terms | FICGS reserves the rights on the text of its site |
 
-**The text is not in this repository, and that is a licence decision rather than a size
-decision.** The FICGS terms reserve "the general structure, texts, images, graphism, documents,
-databases and every element of the site" and allow copying games only, in PGN. So what is
+**The text is kept out of this repository because of its licence, not its size.**
+The FICGS terms reserve
+"the general structure, texts, images, graphism, documents, databases and every element of
+the site" and allow copying games only, in PGN. So what is
 tracked is the index: for each article its title, its ECO code, its opening moves and the page
 it came from. One command downloads the articles again:
 
@@ -32,9 +33,9 @@ cd backend
 uv run python -m scripts.fetch_wikichess
 ```
 
-The index is what makes that command replayable. It names twenty-one pages by URL, so a reader
-who runs it gets the same corpus, and not whatever the site holds today; a page that has
-since disappeared shows up as a failure, where an unlisted download would simply return a
+The index makes that command replayable. It names twenty-one pages by URL, so a reader who
+runs it gets the same corpus, and not whatever the site holds today; a page that has since
+disappeared shows up as a failure, where an unlisted download would simply return a
 smaller corpus.
 
 ### Eleven notes written in French
@@ -57,8 +58,8 @@ Spanish opening has to reach an English article about the Ruy Lopez, and it does
 | Written by | contributors of the FICGS site | this repository |
 | Indexed in the same Milvus collection | yes | yes |
 
-The folder of origin travels with each indexed passage, which is what lets the interface
-label an answer: a reader can see whether the explanation in front of them was downloaded or
+The folder of origin travels with each indexed passage, so the interface can label an
+answer: a reader can see whether the explanation in front of them was downloaded or
 written here.
 
 ## The theory: the Lichess Opening Explorer

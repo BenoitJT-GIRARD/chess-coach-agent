@@ -26,23 +26,23 @@ Lopez, and here is the idea behind it.* Or: *this is a sideline, nobody plays it
 what the engine thinks.* Or: *here is a video that explains it better than I will.*
 
 A language model asked the same question answers all three at once, fluently, and invents the
-move counts. That is the failure this repository is arranged against. The trouble is not that
-the model writes badly. It is that **nothing tells it which of the three cases it is looking
-at**, and nothing gives it the figures it will quote regardless.
+move counts. This repository is arranged against that failure. The model writes well enough;
+what it lacks is any signal of which of the three cases it is looking at, and any source for
+the figures it will quote regardless.
 
-So the model is not the system here. It is the last node of a graph that has already decided.
-Theory comes from a database of master games, the evaluation from an engine, the explanation
-from a corpus of articles, the videos from a search API. The model is handed those facts and
-asked to write four sentences.
+So the model here is the last node of a graph that has already decided. Theory comes from a
+database of master games, the evaluation from an engine, the explanation from a corpus of
+articles, the videos from a search API. The model is handed those facts and asked to write
+four sentences.
 
-Which leaves the two decisions the system actually takes, and this repository is built around
-measuring them: **when is a position still theory, and how do you ask a knowledge base a
-question it can answer.**
+That leaves two decisions for the system to take, and this repository is built around
+measuring them: when a position is still theory, and how to ask a knowledge base a question
+it can answer.
 
 ## What it does
 
-Six containers under Docker Compose, one command. A LangGraph agent routes a position
-through four sources and writes the answer.
+The project runs as six containers under Docker Compose, started with one command. A
+LangGraph agent routes a position through four sources and writes the answer.
 
 ```mermaid
 flowchart LR
@@ -78,9 +78,10 @@ When the position is not theory, the same screen changes source and says so:
 ### How it is built
 
 The backend is **FastAPI** behind **Uvicorn**, and every response shape is a **Pydantic**
-model, which is what makes the generated OpenAPI page the API documentation and not a second
-description of it. The orchestration is **LangGraph**: a fixed sequence of nodes with
-one conditional edge, so the routing is a comparison between two integers and can be swept.
+model, so the generated OpenAPI page is the API documentation itself, not a second
+description of it. The orchestration is
+**LangGraph**: a fixed sequence of nodes with one conditional edge, so the routing is a
+comparison between two integers and can be swept.
 The only **LangChain** dependency is the client that talks to an OpenAI-compatible endpoint,
 at the last node.
 
@@ -99,7 +100,7 @@ whenever the pipeline is started.
 ### How the question is worded decides what comes back
 
 Retrieval is scored on 14 hand-written questions, each labelled with the set of articles that
-should come back. Four wordings, same corpus, same index:
+should come back. Four wordings were put to the same corpus and the same index:
 
 <!-- source: backend/reports/ablation_retrieval.json -->
 
@@ -119,28 +120,27 @@ should come back. Four wordings, same corpus, same index:
 > first correct article, separating two wordings that find it at different depths. A gap
 > smaller than one case of fourteen is a single question changing its mind.
 
-**Padding the question is what hurts.** The verbose English wording drops recall@1 from 0.86
+**Padding the question hurts retrieval.** The verbose English wording drops recall@1 from 0.86
 to 0.50, which is five questions of the fourteen. Its generic words are the vocabulary every
 article of the corpus shares, so it pulls the most general pages to the top: asked about the
 Ruy Lopez it returns the King's Pawn article at rank 1 and the right article at rank 6.
 
 **The French wording costs one case against the bare opening name,** which on fourteen cases
-is 0.07 of recall and therefore inside the floor this study declares. What the numbers
-separate is a wide gap and not a narrow one. The phrasing is not what matters; not drowning
-the name is.
+is 0.07 of recall and therefore inside the floor this study declares. At that resolution the
+numbers only separate wide gaps. They show that the exact wording does not matter, and that
+keeping the opening name from being buried in generic words does.
 
-**These four rows are worse than the ones this repository published a week ago, and that is
-the interesting part.** The screenshot at the top of this page exposed a product defect: what an article writes
-above its first sentence, four lines of codes and links, was reaching the player as though it
-were prose. It was reaching the embedder too.
+**These four rows are worse than the ones this repository published a week ago.** The
+screenshot at the top of this page exposed a product defect: what an article writes above its first sentence, four lines of codes and
+links, was reaching the player as though it were prose, and it was reaching the embedder too.
 Taking it out of the indexed text cost the served wording one case, and cost `name-and-eco`
 its perfect score, which had been 1.00 at every k.
 
-That perfect score was the leak. The variant that appends an ECO code to the query was being
-matched against a chunk that contained that same ECO code, so it was scoring a string
-comparison and not a retrieval. `docs/protocol.md` says a question must never be drawn from
-the article it points at, for exactly this reason; the codes in the text were the same failure
-entering from the other side. The lower numbers are the ones that measure retrieval.
+The perfect score came from a leak. The variant that appends an ECO code to the query was
+being matched against a chunk that contained the same ECO code, so its score measured a
+string match. `docs/protocol.md` says a question must never be drawn from the article it
+points at, for this reason; the codes in the text let the same failure in from the other
+side. The lower numbers measure retrieval.
 
 ### The routing threshold sits on a plateau
 
@@ -179,8 +179,8 @@ first set. Here is what it does across a frozen reading of 54 positions:
 
 **Two positions of the 54 move when the value is divided by three, and none move when it is
 tripled.** The stretch from 500 to 5 000 is flat, and the served value sits inside it. So a
-number picked from two examples turns out to be safe, which is worth knowing and is more than
-the way it was picked had earned.
+number picked from two examples turns out to be safe, though the way it was picked had not
+earned that.
 
 The reading is committed with the day it was taken, because the Explorer is alive: its counts
 climb, and a sweep asking it again would answer something else.
@@ -218,9 +218,10 @@ Measured inside the deployed configuration, four positions, three repeats:
 > drawn here.
 
 The retrieval, the part one worries about on a stack with a vector database, is the cheapest
-node by a factor of four. What a request costs is the engine and YouTube, and the engine runs
-only once the position has left theory. The bench leaves the language model out: its call is billed, and one slow generation on a
-third-party endpoint would bury every local node. In a real request it is the dominant cost.
+node by a factor of four. The cost of a request comes from the engine and YouTube, and the
+engine runs only once the position has left theory. The bench leaves the language model out:
+its call is billed, and one slow generation on a third-party endpoint would bury every local
+node. In a real request it is the dominant cost.
 
 ### The model writes up; it does not choose
 
@@ -259,17 +260,17 @@ the language it was asked to coach in.
 
 So the two flags for a move that does not exist are an artefact of judging every citation
 against the current board, when a coach talks about moves already played and moves that might
-be. What the run establishes is the claim the interface depends on: **the moves come from the
-tools.** Of 116 citations, 113 were either given in the prompt or part of the opening's own
+be. The run establishes the claim the interface depends on: the moves come from the tools.
+Of 116 citations, 113 were either given in the prompt or part of the opening's own
 line.
 
 ## Why these numbers can be believed
 
 **The retrieval claim already existed, and had no artefact.** The docstring of
 `build_context_query` asserted that a short French question beats a padded English one, and
-the commit that introduced it said "verified on six openings". The observation was right, the
-ablation above confirms it and puts 36 points on it, and nothing in the repository recorded
-which six openings, what came back, or what was compared to what. Nobody could replay it, and
+the commit that introduced it said "verified on six openings". The ablation above confirms the
+observation and puts 36 points on it, but nothing in the repository recorded which six
+openings, what came back, or what was compared to what. Nobody could replay it, and
 nothing would have said when it stopped being true.
 
 **The evaluation questions are written by hand, never generated from their target.** A
@@ -399,8 +400,8 @@ frozen reading holds positions, not the move orders that reach them.
 their contributors, and this repository measures which one is returned, not whether what it
 says is right.
 
-**Nothing measures the quality of the written answer.** It would take a judge, and a judge
-mostly measures the judge.
+**Nothing measures the quality of the written answer.** It would take a judge, and a judge's
+score says more about the judge than about the answer.
 
 **Nothing here has been deployed.** Six containers on one machine, with localhost ports.
 `docs/operations.md` says what a deployment would need and what this stack already carries.

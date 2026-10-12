@@ -9,30 +9,30 @@
 ## 1. Context and objective
 
 The chess agent today helps players by analysing a game in progress, suggesting moves,
-explaining plans, and pointing them at learning material. Video sits at the centre of that
-material: YouTube holds a considerable amount of teaching content — grandmaster analyses,
-opening courses, theoretical endgames, annotated games. The agent already recommends
-videos, but it does so through a **plain text query** sent to the YouTube search API.
+explaining plans, and pointing them at learning material. Video is central to that
+material: YouTube holds a large amount of teaching content, including grandmaster
+analyses, opening courses, theoretical endgames and annotated games. The agent already
+recommends videos, but it does so through a plain text query sent to the YouTube search API.
 
-That approach runs out of road quickly. When a user is facing a specific position, a
-Sicilian Najdorf structure after the fifteenth move say, the agent can only return a
-*thematic* video: "Understanding the Najdorf", forty-five minutes long. The user then has
-to scrub through it to maybe find the relevant passage. The real need is not "a video about
-the Sicilian" but **"the explanation of THIS position, at THIS exact second"**. The gap
-between the granularity of the search (a video title) and the granularity of the need (a
-moment inside a video) is the problem this note addresses.
+That approach soon reaches its limit. When a user faces a specific position, say a Sicilian
+Najdorf structure after the fifteenth move, the agent can only return a *thematic* video
+such as "Understanding the Najdorf", forty-five minutes long, and the user has to scrub
+through it hoping to find the relevant passage. What the user needs is the explanation of
+that position, at the second where it is given. This note addresses the gap between the
+granularity of the search (a video title) and the granularity of the need (a moment inside
+a video).
 
-**What the proposed system does.** Analyse a catalogue of teaching videos, automatically
-extract the chess positions displayed on screen, convert them to **FEN**
-(*Forsyth–Edwards Notation*), and index them so that every position is bound to a
-`(video, timestamp)` pair. The existing agent could then query the module with the
-**exact position** of the game in progress and receive a video link pointing straight at
-the second where that position is explained.
+**What the proposed system does.** It analyses a catalogue of teaching videos, automatically
+extracts the chess positions displayed on screen, converts them to FEN
+(*Forsyth–Edwards Notation*), and indexes them so that every position is bound to a
+`(video, timestamp)` pair. The existing agent could then query the module with the exact
+position of the game in progress and receive a video link pointing straight at the second
+where that position is explained.
 
-This document is a **design feasibility note**: it describes the system, its target
-architecture around an **MCP (Model Context Protocol)** server, its benefits, its limits,
-its forecast costs (CAPEX/OPEX), its risks, alternatives, and a roadmap. It is not a
-software delivery; no development is committed at this stage.
+This document is a design feasibility note. It describes the system, its target
+architecture around an MCP (Model Context Protocol) server, its benefits, limits, forecast
+costs (CAPEX/OPEX) and risks, the alternatives, and a roadmap. It is not a software
+delivery, and no development is committed at this stage.
 
 **Scope.** The system targets videos showing a **synthetic 2D board**, the diagrams an
 analysis tool such as Lichess, Chess.com or ChessBase generates, which is the overwhelming
@@ -43,9 +43,8 @@ are treated as degraded cases (see §5).
 
 ## 2. Functional description
 
-The system provides two functionally distinct services, which correspond to two very
-different execution regimes: **ingestion** (offline, batched) and **query** (online, real
-time).
+The system provides two distinct services that run in two very different execution
+regimes: ingestion (offline, batched) and query (online, real time).
 
 ### 2.1 Catalogue ingestion (offline)
 
@@ -53,14 +52,14 @@ time).
    title, author, language, topic, licence). It can be enriched by hand or by automatic
    discovery over a vetted set of channels.
 2. **Fetching the stream.** For each video, the stream is fetched at a resolution
-   sufficient to read the board — 720p is ample for a 2D diagram.
-3. **Frame sampling.** Using **ffmpeg**, one image is extracted at a fixed interval
+   sufficient to read the board; 720p is ample for a 2D diagram.
+3. **Frame sampling.** Using ffmpeg, one image is extracted at a fixed interval
    (reference rate: **one frame every 5 seconds**). A chess position stays on screen for
    several seconds; sampling every frame would be pointless and expensive.
 4. **Board detection.** On each frame, a detector locates the region holding a board
    (cropping, perspective correction where needed). Frames with no board, such as the
    commentator's face, a title card or an advert, are discarded.
-5. **Board-to-FEN conversion.** A **vision model** (something like *fenify-3D*, or an
+5. **Board-to-FEN conversion.** A vision model (something like *fenify-3D*, or an
    OpenCV grid-detection pipeline followed by a CNN classifying the 64 squares) recognises
    the piece on each square and produces a FEN string describing the position.
 6. **Temporal deduplication.** This is structural, not an implementation detail. A teacher
@@ -68,14 +67,14 @@ time).
    frame every five seconds, that single position would produce **96 identical records**,
    and the user would be offered the same video 96 times. Consecutive frames describing
    the same position are therefore collapsed into a single record, which keeps the
-   **timestamp of first appearance**, the moment the teacher starts talking about it,
-   which is exactly where the user should be sent. A position that reappears later in the
-   video, after several others, is a new record: the teacher has come back to it for a
-   different reason.
+   timestamp of first appearance, the moment the teacher starts talking about it, which
+   is where the user should be sent. A position that reappears later in the video, after
+   several others, is a new record: the teacher has come back to it for a different
+   reason.
 
-   What is returned to the user is never a frame. The frame is a processing artefact,
-   deleted after extraction; what matters is the **(video, timestamp) pair**, rendered as
-   a timestamped link.
+   The user never receives a frame. Frames are processing artefacts, deleted after
+   extraction; what the user gets is the (video, timestamp) pair, rendered as a
+   timestamped link.
 7. **Indexing.** Each position is stored as
    `(FEN, video_id, start_timestamp, end_timestamp, confidence, metadata)` in a queryable
    store.
@@ -84,33 +83,33 @@ time).
 
 From the existing agent:
 
-1. The agent knows the **current position** — it already holds it as a FEN in its state.
+1. The agent already holds the current position as a FEN in its state.
 2. It calls the module's search tool with that FEN.
 3. The module queries the index and returns the video segments matching that position, or
    one very close to it, sorted by relevance and source quality.
-4. The agent gives the user a **deep link** of the form
+4. The agent gives the user a deep link of the form
    `https://youtu.be/<id>?t=<seconds>`, with the title and the author.
 
-The granularity drops from "a video" to "a second inside a video", which is the problem
+The granularity drops from "a video" to "a second inside a video", which answers the problem
 stated in §1.
 
 ### 2.3 Normalisation and tolerance
 
 A full FEN carries the side to move, castling rights, the en-passant square and the move
-counters. For a teaching search only the **piece placement**, the first FEN field, and
-ideally the side to move are relevant, so what is indexed is a **normalised key**
-(placement + side to move). **Exact position** search is the main function; **approximate**
-search (positions one or two moves away, or identical pawn structures) is planned as an
-extension, to absorb small recognition errors and widen recall.
+counters. For a teaching search only the piece placement, the first FEN field, and ideally
+the side to move are relevant, so what is indexed is a normalised key (placement + side to
+move). Exact position search is the main function; approximate search (positions one or two
+moves away, or identical pawn structures) is planned as an extension, to absorb small
+recognition errors and widen recall.
 
 ---
 
 ## 3. Technical architecture (MCP server)
 
-The architecture separates the **ingestion chain** (batched, compute-hungry) from the
-**query chain** (light, real time), the two meeting on a shared **position index**.
-Exposure to the agent goes through an **MCP server** implemented with **FastMCP**, which
-presents standardised tools decoupled from the internals.
+The architecture separates the ingestion chain (batched, compute-hungry) from the query
+chain (light, real time), the two meeting on a shared position index. The agent reaches the
+module through an MCP server implemented with FastMCP, which presents standardised tools
+decoupled from the internals.
 
 ### 3.1 Architecture diagram
 
@@ -159,9 +158,9 @@ flowchart TD
 
 `YouTube catalogue` → `ffmpeg (1 frame / 5 s)` → `board detection (crop / perspective)` →
 `board-to-FEN (vision model)` → `deduplication + confidence` → `index (SQL FEN+timestamp
-and vector index)`. Alongside, the **MCP server** reads that index and exposes three tools.
-The **LangGraph agent** calls `search_position(fen)` with the current position, receives a
-list of `(video, timestamp)` segments, and hands the **user** a timestamped link. The
+and vector index)`. Alongside, the MCP server reads that index and exposes three tools.
+The LangGraph agent calls `search_position(fen)` with the current position, receives a
+list of `(video, timestamp)` segments, and hands the user a timestamped link. The
 ingestion command `ingest_video(url)` pushes a new video back to the head of the pipeline.
 
 ### 3.3 Components
@@ -173,13 +172,13 @@ ingestion command `ingest_video(url)` pushes a new video back to the head of the
 - **Board detector**: finds the 8×8 grid, fixes orientation and framing. For a 2D diagram,
   contour and line detection (Hough / OpenCV) is enough; for a filmed board, a homography
   is estimated.
-- **Board-to-FEN model**: the heart of the system. Cuts the board into 64 squares and
-  classifies each into 13 states (6 pieces × 2 colours + empty). Emits the FEN and an
-  aggregate **confidence score**.
+- **Board-to-FEN model**: the central component. It cuts the board into 64 squares,
+  classifies each into 13 states (6 pieces × 2 colours + empty), and emits the FEN with an
+  aggregate confidence score.
 - **Deduplication module**: compares successive FENs, merges repeats, keeps the first
   timestamp and the highest confidence.
-- **Position index**: a **SQL** store (`positions` table) for exact-key lookup on the
-  indexed normalised FEN; an optional **vector index** encoding the position (a 64-square
+- **Position index**: a SQL store (`positions` table) for exact-key lookup on the
+  indexed normalised FEN; an optional vector index encoding the position (a 64-square
   vector, or a structure embedding) for approximate search.
 - **MCP server (FastMCP)**: the exposure layer. It holds no heavy domain logic; it
   translates tool calls into index queries or ingestion commands.
@@ -195,37 +194,37 @@ ingestion command `ingest_video(url)` pushes a new video back to the head of the
 ### 3.5 Data flow: ingestion versus query
 
 - **Ingestion**: asynchronous, batched, triggered when a video is added or on a schedule.
-  Consumes **GPU** (board-to-FEN) and **CPU** (ffmpeg). Writes to the index. Latency is not
-  critical — minutes per video are fine.
+  Consumes GPU (board-to-FEN) and CPU (ffmpeg). Writes to the index. Latency is not
+  critical: minutes per video are fine.
 - **Query**: synchronous, triggered by the agent. Consumes almost no compute (one indexed
   read). Latency is critical: **target below 200 ms**, so that it stays invisible inside
   the conversation.
 
-That separation is what guarantees the GPU cost never touches the user's response time:
-all the heavy work happens once, upstream.
+That separation keeps the GPU cost out of the user's response time, because all the heavy
+work happens once, upstream.
 
 ---
 
 ## 4. Expected benefits
 
-- **Surgical relevance.** The user gets the exact *second* where their position is
-  explained, instead of a whole video to scrub through. That is the central, differentiating
-  gain.
-- **Reuse of the agent's state.** The agent already holds the FEN of the game in progress;
-  the user is asked for nothing extra. The integration is natural.
+- **Precise relevance.** The user gets the exact *second* where their position is
+  explained, instead of a whole video to scrub through. This is the main gain.
+- **Reuse of the agent's state.** The agent already holds the FEN of the game in progress,
+  so the user is asked for nothing extra.
 - **Decoupling through MCP.** Exposing the module over MCP isolates it from the agent's
   internals. The same server could serve other clients, a web interface or another
   assistant, with no rewrite.
 - **Value drawn from existing material.** Thousands of hours of good teaching sit on
   YouTube with no fine-grained index. The system creates a position-level access layer that
   exists nowhere else.
-- **Incremental accumulation.** Every ingested video enriches the index permanently. Value
-  grows with the catalogue, at a low marginal ingestion cost (see §6).
-- **Approximate search later.** Beyond the exact position, the vector index opens the way
-  to "show me videos about similar pawn structures", which is a strong teaching feature.
+- **Incremental accumulation.** Every ingested video stays in the index, so the value grows
+  with the catalogue, at a low marginal ingestion cost (see §6).
+- **Approximate search later.** Beyond the exact position, the vector index would allow
+  requests such as "show me videos about similar pawn structures", which would be a strong
+  teaching feature.
 - **Measurability.** Coverage, the share of current positions actually found in the index,
-  and board-to-FEN accuracy are trackable metrics, which turn the delivered value into a
-  number.
+  and board-to-FEN accuracy are trackable metrics, so the delivered value can be expressed
+  as a number.
 
 ---
 
@@ -235,7 +234,7 @@ all the heavy work happens once, upstream.
   produces a wrong FEN, hence a missing or wrong index key. 2D models on clean diagrams
   reach very high per-square accuracy, often above 99 %, but at 99 % per square a position
   with 32 occupied squares has roughly a 0.99³² ≈ **72 %** chance of being *entirely*
-  correct. A confidence score and a rejection threshold are therefore not optional if the
+  correct. A confidence score and a rejection threshold are therefore required if the
   index is to stay clean.
 - **Visual diversity.** Board colour themes, piece sets, overlays (arrows, highlighted
   squares, channel branding), banners and logos all disturb the classifier. Each style may
@@ -243,25 +242,26 @@ all the heavy work happens once, upstream.
 - **Camera angles and 3D pieces.** Videos of physical boards filmed in perspective, and
   stylised 3D renders, degrade reliability sharply. They are out of the priority scope and
   would be handled later, or dropped.
-- **Storage volume.** Under control as long as raw frames are not kept. See the arithmetic
-  in §6: the index itself is light, a few gigabytes, and the temporary frames dominate but
-  are deletable after processing.
+- **Storage volume.** Storage stays under control as long as raw frames are not kept. The
+  arithmetic in §6 shows the index itself is light, a few gigabytes; the temporary frames
+  dominate, but they can be deleted after processing.
 - **GPU cost.** Board-to-FEN inference over the whole catalogue is the expensive step. It
   stays modest in absolute terms (see §6) because it is one-off and parallelisable.
-- **Copyright and YouTube's terms.** A **sensitive business point**. Downloading and storing
-  frames from third-party videos touches copyright and YouTube's terms of use. Recommended
-  strategy: do **not** redistribute the content; keep only the FEN and the timestamp
-  durably (*factual* data, not protectable); delete the frames after extraction; and return
-  only a **deep link** to the original video, so the creator keeps the views and the
-  monetisation. A legal review is needed before industrialisation.
+- **Copyright and YouTube's terms.** This is a sensitive business point: downloading and
+  storing frames from third-party videos touches copyright and YouTube's terms of use. The
+  recommended strategy is to redistribute none of the content; keep only the FEN and the
+  timestamp durably (*factual* data, not protectable); delete the frames after extraction;
+  and return only a deep link to the original video, so the creator keeps the views and
+  the monetisation. A legal review is needed before industrialisation.
 - **Catalogue maintenance.** Videos get deleted, turned private, or re-uploaded with URLs
   and timestamps that no longer hold. Periodic link validation and a re-ingestion policy are
   required.
 - **Ingestion latency versus freshness.** A newly published video is only searchable after
-  it has gone through the pipeline. Acceptable for teaching use, but it must be documented.
-- **Incomplete coverage.** Not every position appears in a video. The system is a
-  **complement** with real added value, not a guarantee of an answer to every query. A
-  fallback, the classic text search, has to stay available.
+  it has gone through the pipeline. That delay is acceptable for teaching use, but it must
+  be documented.
+- **Incomplete coverage.** Not every position appears in a video, so the system adds to the
+  existing search and cannot guarantee an answer to every query. A fallback, the classic
+  text search, has to stay available.
 
 ---
 
@@ -294,16 +294,16 @@ set to stay on the safe side.
 **Indexed positions**: 12 × 1 000 = **~12 000** unique positions. That is the system's unit
 of value.
 
-**Storage.** Keeping *every* frame would be 144 000 × 150 KB ≈ **21.6 GB** — well under a
-terabyte. In practice frames are **deleted once the FEN is extracted**; at most one
+**Storage.** Keeping *every* frame would be 144 000 × 150 KB ≈ **21.6 GB**, well under a
+terabyte. In practice frames are deleted once the FEN is extracted; at most one
 thumbnail per indexed position is kept: 12 000 × 150 KB ≈ **1.8 GB**. The SQL index (FEN +
 metadata) weighs a few tens of megabytes. **Durable storage budget: ~2 GB.** Volume is not
 the limiting factor.
 
 **Ingestion GPU (initial catalogue)**: 144 000 frames × 0.2 s = 28 800 s ≈ **8 GPU hours**.
 With margin for retries, double-cropped frames and overhead: **~12 GPU hours**. At €0.40/h
-that is **~€5** to process all 1 000 videos. Counter-intuitively, the GPU cost is
-**negligible**; the ffmpeg extraction (CPU) is of the same order.
+that is **~€5** to process all 1 000 videos. Counter-intuitively, the GPU cost is negligible,
+and the ffmpeg extraction (CPU) is of the same order.
 
 ### 6.3 Setup costs — CAPEX
 
@@ -345,13 +345,12 @@ A catalogue of **12 000 positions** in the first year.
 - **Steady state** (OPEX only, development excluded): ~€816/year ÷ ~14 400 positions, on a
   growing catalogue ≈ **€0.06/position/year**.
 
-**How to read that.** The system is **CAPEX-dominated**, by the vision model's R&D, while
-**running it is very cheap**: the GPU, against intuition, costs a few euros a month, thanks
-to the 1-frame-in-5-seconds sampling and the deduplication. The real recurring cost is
-**hosting** (the MCP server and the database), not compute. Against 12 000 positions
-searchable at the heart of the user experience, the marginal cost is marginal: **economic**
-feasibility is favourable, and the lock is **technical** feasibility — board-to-FEN
-accuracy, §5.
+**How to read that.** Most of the cost is CAPEX, the vision model's R&D, and running the
+system is very cheap: the GPU costs a few euros a month, thanks to the 1-frame-in-5-seconds
+sampling and the deduplication. The recurring cost is mostly hosting (the MCP server and the
+database) rather than compute. For 12 000 searchable positions the marginal cost is small,
+so the economic case is favourable; what could block the project is technical feasibility,
+meaning board-to-FEN accuracy (§5).
 
 ---
 
@@ -375,32 +374,31 @@ accuracy, §5.
 
 ### 8.1 Alternative A — No vision: YouTube chapters and transcripts
 
-YouTube exposes **chapters** and a **timestamped transcript** (subtitles) for many videos. A
-purely textual approach would index those transcripts and search by keyword — "Najdorf",
-"the b5 push", move names spoken aloud in algebraic notation.
+YouTube exposes chapters and a timestamped transcript (subtitles) for many videos. A purely
+textual approach would index those transcripts and search by keyword, such as "Najdorf",
+"the b5 push", or move names spoken aloud in algebraic notation.
 
-- **Cost**: very low. No GPU, no vision model, no heavy R&D. CAPEX an order of magnitude
-  smaller (~10–15 days).
-- **Value**: limited and imprecise. A teacher does not **speak** the full position; they
-  talk about plans and moves without enumerating 32 pieces. So an **exact position** cannot
-  be found, only a theme — which reproduces, barely refined, the present problem (§1).
-- **Verdict**: useful as an **economic base** and as a **fallback**, but it does not solve
+- **Cost**: very low, with no GPU, no vision model and no heavy R&D. CAPEX is an order of
+  magnitude smaller (~10–15 days).
+- **Value**: limited and imprecise. A teacher talks about plans and moves without reading
+  out the full position or enumerating 32 pieces, so a transcript can locate a theme but
+  not an exact position. That barely improves on the present problem (§1).
+- **Verdict**: useful as an economic base and as a fallback, but it does not solve
   position-level pointing.
 
 ### 8.2 Alternative B — Hybrid: transcripts plus targeted vision
 
-Use transcripts and chapters first to **pre-filter** the videos and the relevant passages,
-then run the expensive board-to-FEN only on those **sub-segments**, leaving the rest of the
-catalogue untouched.
+This approach uses transcripts and chapters first to pre-filter the videos and the relevant
+passages, then runs the expensive board-to-FEN only on those sub-segments, leaving the rest
+of the catalogue untouched.
 
-- **Cost**: intermediate. Sharply reduces the number of frames analysed, down to the
-  segments where a board is probably being discussed, and with them the GPU time and the
-  annotation effort.
-  Moderate CAPEX.
-- **Value**: high. It keeps vision's **position-level precision** where it matters, while
+- **Cost**: intermediate. Pre-filtering sharply reduces the number of frames analysed, down
+  to the segments where a board is probably being discussed, and with them the GPU time and
+  the annotation effort. CAPEX is moderate.
+- **Value**: high. It keeps vision's position-level precision where it matters, while
   using the free textual signal for coverage and semantic framing (a chapter title is a
   topic).
-- **Verdict**: **best value for money**. This is the recommended endpoint: start with pure
+- **Verdict**: best value for money. This is the recommended endpoint: start with pure
   vision on a restricted catalogue to validate accuracy, then switch to the hybrid to scale
   economically.
 
@@ -428,38 +426,32 @@ catalogue untouched.
 Cumulative duration to industrialisation: **~18 weeks** (≈ 4.5 months), consistent with the
 85-day estimate in §6 for a small team.
 
-**Why that order.** The **POC** clears risk number one, board-to-FEN accuracy, before any
+**Why that order.** The POC clears risk number one, board-to-FEN accuracy, before any
 heavy investment: if it fails, the project stops or falls back to alternative A at low cost.
-The **MVP** validates the full chain and the end-to-end user experience. **Industrialisation**
-is only committed once the value is demonstrated, and adopts the hybrid approach to keep
-cost under control at scale.
+The MVP validates the full chain and the end-to-end user experience. Industrialisation is
+only committed once the value is demonstrated, and adopts the hybrid approach to keep cost
+under control at scale.
 
 ---
 
 ## 10. Conclusion and recommendation
 
-The proposed video-analysis system answers a **real and precisely identified need**: moving
-from "a video about a topic" to "the right second for the exact position". The architecture
-around an **MCP server** is sound: it decouples the module cleanly from the existing agent,
-separates heavy ingestion (GPU, offline) from light queries (real time), and exposes stable,
-reusable tools.
+The proposed video-analysis system answers a real, specific need: moving from "a video about a
+topic" to "the right second for the exact position". The architecture around an MCP server
+is sound: it decouples the module cleanly from the existing agent, separates heavy ingestion
+(GPU, offline) from light queries (real time), and exposes stable, reusable tools.
 
-The economics are **favourable**: running cost is low (≈ **€68/month**), dominated by
-hosting rather than compute, and in steady state it comes down to a few **cents per indexed
-position**. The investment is concentrated in **CAPEX** (≈ **€40k**), which is the vision
-model's R&D.
+The economics are favourable: running cost is low (≈ **€68/month**), dominated by hosting
+rather than compute, and in steady state it comes down to a few cents per indexed position.
+The investment is concentrated in CAPEX (≈ **€40k**), which is the vision model's R&D.
 
-**The lock is not cost, it is accuracy** — board-to-FEN across the diversity of real video
-styles. Hence the recommendation: **validate that risk with a POC first** (phase 1, target
-position accuracy ≥ 70 %) before committing to industrialisation, then adopt the **hybrid
-transcript-plus-vision approach** (alternative B) to scale at the best value for money. A
-**fallback to text search** must stay available for positions outside the catalogue.
+The obstacle is accuracy: board-to-FEN has to cope with the diversity of real video styles.
+The recommendation is therefore to validate that risk with a POC first (phase 1, target
+position accuracy ≥ 70 %) before committing to industrialisation, then to adopt the hybrid
+transcript-plus-vision approach (alternative B) to scale at the best value for money. A
+fallback to text search must stay available for positions outside the catalogue.
 
 **Recommendation**: commit to phases 0 and 1, framing and POC, about five weeks at low
-cost, as a **decision gate**. The POC results decide whether to continue to MVP and
-industrialisation. The risk is contained, the investment is staged, and the value is
-demonstrated before any large-scale rollout.
-
----
-
-*End of the feasibility note.*
+cost, as a decision gate. The POC results decide whether to continue to MVP and
+industrialisation, so the investment is staged and the value is demonstrated before any
+large-scale rollout.

@@ -6,8 +6,8 @@ Every label the tables use is defined once in [`metrics.yaml`](../metrics.yaml),
 per-case detail of each study sits beside the table it summarises, under
 [`backend/reports/`](../backend/reports/).
 
-One property the four share: each replays from a file committed here. No key, no running
-stack, and no live call to the site the corpus came from.
+All four replay from a file committed here, with no key, no running stack and no live call
+to the site the corpus came from.
 
 ## 1. Retrieval: does the wording of the question matter?
 
@@ -33,9 +33,9 @@ the cases are in
 | `english-verbose` | `chess opening X: main ideas, plans and typical moves` |
 | `name-and-eco` | the name followed by its ECO code |
 
-The `french-question` row is not a paraphrase of what the agent does: the script calls the
-agent's own `build_context_query`, and a unit test fails if that stops being true. A variant
-that reimplements the thing it measures measures the reimplementation.
+For the `french-question` row, the script calls the agent's own `build_context_query`, and a
+unit test fails if that stops being true. A variant that reimplemented the function would
+only measure its own copy.
 
 ### What is indexed, and what is not
 
@@ -77,8 +77,8 @@ to [`backend/data/eval/theory_positions.json`](../backend/data/eval/theory_posit
 
 **The reading is frozen and dated on purpose.** The `masters` database grows: a position with
 nine hundred games today has eleven hundred next year, and a sweep that queried it live would
-publish a different table each month with nothing in the agent having changed. Freezing the
-reading is what makes the study a measurement of the threshold instead of the calendar.
+publish a different table each month with nothing in the agent having changed. With the
+reading frozen, only the threshold can change the table.
 
 ### What is varied, and what is read
 
@@ -92,7 +92,8 @@ The README shows the seven rows around the served value; the full sweep from 0 t
 
 ### What the design cannot settle
 
-Sensitivity is not correctness. A position sent to the book is answered from master games, and
+The sweep measures how much the routing moves with the threshold, not whether it routes well.
+A position sent to the book is answered from master games, and
 one sent to the engine is answered from a search; which of the two serves a player better is a
 question this study never asks, and could not answer without a judge.
 
@@ -112,26 +113,27 @@ Twenty-one positions, each answered twice by `gpt-4o-mini` at temperature 0.3. F
 calls, and each answer is kept in the JSON beside the table so the reading can be redone for
 nothing.
 
-The positions are not a sample. They are every line of the frozen reading that the routing
-sent to the engine, plus the twelve shallowest of those it sent to the book, so both branches
-of the graph are exercised. That matters because the two branches build different prompts.
+The positions are not a sample: they are every line of the frozen reading that the routing
+sent to the engine, plus the twelve shallowest of those it sent to the book, so both branches of the graph are
+exercised. That matters because the two branches build different prompts.
 
 ### The reader is the measurement
 
 Every move named in an answer is classified against two things: the board that produced it, and
 the list of moves the prompt carried. Four outcomes, and the README's table is their counts.
 
-**The parser was wrong the first time, and wrong in the direction that accuses.** Ten citations
+**The parser was wrong the first time, and every error was a false accusation against the
+model.** Ten citations
 came back as moves that do not exist; read one by one, all ten were faults of the parser and
 not of the model. A move following a numbered one belongs to the same line although it carries
 no number of its own; a square named as a place is not a move; an opening's first move quoted
 in its history is not a claim about the board. Each of the three shapes became a unit test on
 the sentence that exposed it.
 
-Two consequences follow, and both are visible in what is published. The table comes from a
-**fresh** run, so the parser is not scored on the text it was tuned against. And the counts
-obtained with every square-looking token read as a move are published beside it, as an upper
-bound on what a stricter parser could possibly flag.
+This had two consequences for what is published. The table comes from a fresh run, so the
+parser is not scored on the text it was tuned against. And the counts obtained with every
+square-looking token read as a move are published beside it, as an upper bound on what a
+stricter parser could flag.
 
 ### What the design cannot settle
 

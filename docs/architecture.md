@@ -75,19 +75,19 @@ flowchart TD
     PERSIST --> END2(("Answer to the user"))
 ```
 
-`theory` is the node that **chooses the information source**, and it is the graph's only
+`theory` is the node that chooses the information source, and it is the graph's only
 conditional edge: established position, give the theory; otherwise, let the engine speak.
 
-The rule is explicit, and it has to be. Lichess's master database answers for almost any
-legal position, so it is not the presence of an answer that makes theory but the **number
-of games** behind it. The threshold is configurable — `THEORY_MIN_GAMES`, 1 000 by
-default: the Italian Game after 3.Bc4 Bc5 rests on 25 559 master games, 1.e4 e5 2.Qh5
-on 48, read on 2026-09-07.
+The rule has to be explicit, because Lichess's master database returns an answer for almost
+any legal position; what decides theory is the number of games behind that answer. The
+threshold is configurable through `THEORY_MIN_GAMES` and defaults to 1 000. For scale, the
+Italian Game after 3.Bc4 Bc5 rests on 25 559 master games and 1.e4 e5 2.Qh5 on 48, read on
+2026-09-07.
 
-That number used to rest on those two examples alone. A sweep has since put a figure on how
-much it matters, and the answer is that the branch barely notices a factor of three either
-way. The README shows the rows around the served value, `protocol.md` says how the sweep was
-built, and `../backend/reports/theory_threshold_sweep.md` holds the whole curve.
+That number used to rest on those two examples alone. A sweep has since measured how much it
+matters: the branch barely notices a factor of three either way. The README shows the rows
+around the served value, `protocol.md` says how the sweep was built, and
+`../backend/reports/theory_threshold_sweep.md` holds the whole curve.
 
 The move the interface puts forward follows the same rule: inside theory, the one most
 played in master games; outside it, Stockfish's. The language model is told which one was
@@ -95,8 +95,7 @@ chosen, so that it comments on the move the player actually has in front of them
 
 When a position falls below the threshold, Lichess's answer is kept anyway. It often
 carries a name and a game count, and *"Scholar's Attack, 48 master games"* teaches a player
-more than *"unknown position"* — the point being precisely that the line exists and nobody
-plays it.
+more than *"unknown position"*, because it tells them the line exists and nobody plays it.
 
 The state accumulates the list of tools actually used (`sources_used`), which the interface
 shows under the answer.
@@ -116,8 +115,8 @@ backend/src/chess_coach/
 ```
 
 The dependency rule runs one way only: `api` and `agent` call `services`, never the
-reverse. That is what lets the agent be tested against fake services, with no network and
-no container. `evaluation` depends on both and nothing depends on it.
+reverse. This lets the agent be tested against fake services, with no network and no
+container. `evaluation` depends on both and nothing depends on it.
 
 | Service | Role | Behaviour when it fails |
 | --- | --- | --- |
@@ -131,9 +130,9 @@ no container. `evaluation` depends on both and nothing depends on it.
 | `youtube` | Video search | Empty list, the rest of the answer stands |
 | `mongo` | History | Write ignored, read empty |
 
-Which is what makes the whole stack work with no key at all: the local book replaces the
+That table is why the whole stack works with no key at all: the local book replaces the
 Explorer, the deterministic template replaces the model, and the videos section stays
-empty. What each missing key costs is one row of that table.
+empty. Each missing key costs one row of it.
 
 ---
 
@@ -149,16 +148,16 @@ flowchart LR
 ```
 
 32 articles in two folders. The Wikichess pages are not redistributed with this
-repository, because FICGS keeps every right on the text of its site, so the download is what
-fills that folder, once, before the first ingestion; what is versioned is the manifest
-that lists which articles the corpus is made of. Each indexed passage carries the name of its
-folder, which is how the interface can say where an answer came from and how the ablation can
+repository, because FICGS keeps every right on the text of its site, so a download fills
+that folder, once, before the first ingestion; for those pages the repository versions the
+manifest that lists which articles the corpus is made of. Each indexed passage carries the
+name of its folder, which is how the interface can say where an answer came from and how the ablation can
 score against a label it did not have to guess.
 
 The corpus is deliberately bilingual: the Wikichess pages are English, the complementary
 notes are French, and the queries are French. That is why the embedding model is
 multilingual, and it is the reason a badly worded query hurts here more than it would on a
-single-language corpus — the ablation puts 36 points of recall on it.
+single-language corpus; the ablation puts 36 points of recall on it.
 
 ---
 
@@ -176,7 +175,7 @@ single-language corpus — the ablation puts 36 points of recall on it.
    the videos, and the tools the agent actually used.
 
 Measured inside the deployed configuration: 18 ms for the vector search, 76 ms for the
-Explorer, 276 ms for YouTube, 346 ms for Stockfish. The language model is excluded — it is
+Explorer, 276 ms for YouTube, 346 ms for Stockfish. The language model is excluded: it is
 billed per call, and in practice it dominates a real request.
 
 ---
@@ -196,27 +195,26 @@ Five named volumes keep the state between restarts:
 | `mongo_data` | The interaction history |
 | `hf_cache` | The downloaded embedding model |
 
-That is what lets the demonstration restart without re-ingesting the corpus or losing the
+With these volumes the demonstration restarts without re-ingesting the corpus or losing the
 history.
 
 ---
 
 ## 7. What was considered and not built
 
-An architecture document that lists only what exists reads as though nothing else was ever on
-the table. Four things were, and each was set aside for a reason that is still the reason.
+Four other designs were considered, and each was set aside for a reason that still holds.
 
-**A language model asked to answer the question.** The obvious design: hand the position to a
-model and let it write. It was rejected before anything was built, and the README says why —
-the model has no way of knowing which of three situations it is in, and no source for the
-counts it will quote. What is here instead puts the model last, after the routing has been
-decided by a database and an engine, and `docs/protocol.md` measures what that buys.
+**A language model asked to answer the question.** The obvious design hands the position to a
+model and lets it write. It was rejected before anything was built, for the reason the README
+gives: the model has no way of knowing which of three situations it is in, and no source for
+the counts it will quote. The design here puts the model last, after a database and an engine
+have decided the routing, and `docs/protocol.md` measures what that buys.
 
 **A fine-tuned model instead of retrieval.** Thirty-two articles is not a training set. It is
 also the wrong shape of problem: the corpus changes when an article is added, and a retrieval
 index absorbs that in one ingestion while a fine-tune absorbs it in another training run. The
-cost of being wrong is asymmetric too — a retrieval that misses returns the wrong article,
-visibly, with its source; a fine-tune that misses invents.
+cost of being wrong is asymmetric too: a retrieval that misses returns the wrong article,
+visibly, with its source, while a fine-tune that misses invents.
 
 **An agent that chooses its own tools.** LangGraph supports a model deciding which tool to
 call. The graph here is a fixed sequence with one conditional edge, and that edge is a

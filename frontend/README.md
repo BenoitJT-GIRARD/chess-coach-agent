@@ -1,12 +1,12 @@
 # Frontend: the Angular interface
 
 An interactive chessboard and the coach's answer panel. It talks to the FastAPI backend
-through a relative path (`/api/v1`), which is what lets the same build run behind the
+through a relative path (`/api/v1`), which lets the same build run behind the
 container's nginx proxy and behind the `ng serve` dev proxy without a rebuild.
 
 ## What it is built on
 
-Two public bricks, and the attribution matters more than the line count:
+Two public libraries, and the attribution matters more than the line count:
 
 - **[ngx-chess-board](https://www.npmjs.com/package/ngx-chess-board)**: the board itself,
   with its `[size]`, `[lightTileColor]`, `[darkTileColor]` inputs and its `(moveChange)`
@@ -48,7 +48,7 @@ npm install
 npm start          # http://localhost:4200, proxying to http://localhost:8000
 ```
 
-The backend has to be running alongside — see `../backend/README.md`, or the
+The backend has to be running alongside it: see `../backend/README.md`, or the
 `docker compose up` described at the root.
 
 ## Tests

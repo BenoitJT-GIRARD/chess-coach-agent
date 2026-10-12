@@ -1,8 +1,8 @@
 # Running it
 
-Six containers, one command, and a stack that answers before all six are useful. This page is
-about the gap between those two facts: what is up, what is merely running, what each missing
-key costs, and what to look at when an answer stops arriving.
+One command starts six containers, and the stack answers before all six are useful. This page
+covers the gap between answering and being useful: what is up, what is merely running,
+what each missing key costs, and what to look at when an answer stops arriving.
 
 ## Starting it
 
@@ -33,8 +33,8 @@ starting.
 ## What is up, and what is ready
 
 The service answers `/api/v1/healthcheck` as soon as uvicorn binds its port. That is liveness,
-and it is what the container healthcheck and the frontend probe. It is not readiness, and the
-difference is worth knowing:
+and it is what the container healthcheck and the frontend probe. Readiness is another matter,
+and it differs from route to route:
 
 | Route | Works with nothing behind it |
 |---|---|
@@ -51,7 +51,7 @@ difference is worth knowing:
 the first request that needed one, which cost that request ten seconds on a warm cache and a
 few hundred megabytes of download on a cold one. The service now starts, answers its probe,
 and logs `Embedding model ready` when the first search will be fast. Until that line appears, a
-search is slow, and it is not broken.
+search is slow but still works.
 
 ## What each missing key costs
 
@@ -64,8 +64,8 @@ Everything works without a single key. What changes is which source answers.
 | `LLM_API_KEY`, or `LLM_ENABLED=false` | a deterministic French template writes the recommendation from the same facts |
 | the Wikichess download | the retrieval answers from the eleven written notes alone, and `scripts/ingest_wikichess` refuses to index a third of a corpus |
 
-That last refusal is deliberate. An index built on a third of the corpus answers every
-question, plausibly, and scores a third of what `docs/protocol.md` publishes. The ingestion
+The ingestion refuses on purpose, because an index built on a third of the corpus answers
+every question plausibly and scores a third of what `docs/protocol.md` publishes. The ingestion
 reads the manifest, sees that none of the articles it lists is on disk, and names the command
 that fetches them.
 
@@ -123,8 +123,8 @@ are mounted into the container.
 
 No deployment. This stack runs on one machine, with `docker compose`, and every address above
 is a localhost port. There is no orchestration manifest, no ingress, no secret manager and no
-horizontal scaling, because none of them was ever exercised — publishing a Kubernetes chart
-that has never run would be a claim rather than a document.
+horizontal scaling, because none of them was ever exercised, and a Kubernetes chart that has
+never run would assert something nobody has tested.
 
 What the stack does carry is the part a deployment would need first: a liveness probe, a
 healthcheck in the image, dependency ordering between the six services, a non-root user, and
