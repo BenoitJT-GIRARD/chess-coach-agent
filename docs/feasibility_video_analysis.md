@@ -342,8 +342,9 @@ A catalogue of **12 000 positions** in the first year.
 
 - **First year** (CAPEX + 12 months of OPEX): (40 250 + 12 × 68) ÷ 12 000 ≈
   **€3.42/position**.
-- **Steady state** (OPEX only, development excluded): ~€816/year ÷ ~14 400 positions, on a
-  growing catalogue ≈ **€0.06/position/year**.
+- **Steady state** (OPEX only, development excluded): ~€816/year ÷ ~40 800 positions (the
+  initial 12 000 plus 200 videos × 12 positions × 12 months), on a growing catalogue ≈
+  **€0.02/position/year**.
 
 **How to read that.** Most of the cost is CAPEX, the vision model's R&D, and running the
 system is very cheap: the GPU costs a few euros a month, thanks to the 1-frame-in-5-seconds

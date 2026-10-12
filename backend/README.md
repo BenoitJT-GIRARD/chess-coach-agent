@@ -67,7 +67,7 @@ but it starts empty.
 ```powershell
 uv run python -m scripts.run_retrieval_ablation   # four query formulations, 14 cases
 uv run python -m scripts.sweep_theory_threshold   # reads the frozen Explorer reading
-uv run python -m scripts.sample_theory_positions  # re-takes it; the only script needing a token
+uv run python -m scripts.sample_theory_positions  # re-takes it; needs a Lichess token
 uv run python -m scripts.check_move_invention --rejudge   # re-reads the saved answers
 ```
 

@@ -6,8 +6,12 @@ Every label the tables use is defined once in [`metrics.yaml`](../metrics.yaml),
 per-case detail of each study sits beside the table it summarises, under
 [`backend/reports/`](../backend/reports/).
 
-All four replay from a file committed here, with no key, no running stack and no live call
-to the site the corpus came from.
+Two of the four replay from a file committed here, with no key, no running stack and no live
+call to the site the corpus came from: the routing sweep, and the move-invention reading when it
+is judged again from its saved answers (`--rejudge`; a fresh run makes 42 billed calls). The
+retrieval ablation queries the live index, so it needs the stack running and the corpus
+ingested, which means downloading the Wikichess articles first. The latency bench runs inside
+the deployed stack, and its published timings include live calls to the Explorer and to YouTube.
 
 ## 1. Retrieval: does the wording of the question matter?
 
@@ -71,9 +75,10 @@ uv run python -m scripts.run_retrieval_ablation     # needs the stack up and ing
 
 ### The population
 
-Fifty-four positions, walked from the curated opening book at several depths, plus eight lines
-that no master game reaches. The Explorer was queried once for each, and the answer was written
-to [`backend/data/eval/theory_positions.json`](../backend/data/eval/theory_positions.json).
+Fifty-four positions: forty-six walked from the curated opening book at several depths, and
+eight named lines that master games rarely or never reach. The Explorer was queried once for
+each, and the answer was written to
+[`backend/data/eval/theory_positions.json`](../backend/data/eval/theory_positions.json).
 
 **The reading is frozen and dated on purpose.** The `masters` database grows: a position with
 nine hundred games today has eleven hundred next year, and a sweep that queried it live would
