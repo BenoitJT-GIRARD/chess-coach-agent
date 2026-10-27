@@ -6,8 +6,8 @@ paragraph boundaries and group consecutive paragraphs up to a character budget,
 keeping a small overlap so an idea split across two chunks stays retrievable.
 
 **The header block of an article is not prose, and it is not indexed.** Every article opens
-on a quoted block carrying its ECO code, its first moves, a FEN and, for the downloaded ones,
-a source URL and a list of contributors. Left in place it was the first thing in the first
+on a quoted block carrying its ECO code and its first moves, plus, in the downloaded ones, a
+FEN, a source URL and a list of contributors. Left in place it was the first thing in the first
 chunk of every article: embedded with the text, so a query about strategy met a wall of codes
 before a single sentence, and displayed to the player under the board. It is parsed into
 fields on the :class:`Article` and dropped from the text. What the retrieval needs of it —

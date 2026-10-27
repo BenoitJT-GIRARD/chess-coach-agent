@@ -24,6 +24,7 @@ from chess_coach.agent.state import AgentDeps, AgentState
 from chess_coach.agent.synthesize import build_recommendation
 from chess_coach.config import get_settings
 from chess_coach.services.chess_position import describe_position, is_valid_fen
+from chess_coach.services.embeddings import EmbeddingServiceError
 from chess_coach.services.lichess import LichessServiceError
 from chess_coach.services.milvus_store import MilvusStoreError
 from chess_coach.services.mongo import MongoService
@@ -118,7 +119,7 @@ def build_graph(deps: AgentDeps):
         query = build_context_query(state)
         try:
             hits = deps.rag.search(query, top_k=3)
-        except MilvusStoreError:
+        except (MilvusStoreError, EmbeddingServiceError):
             return {"passages": []}
         passages = [asdict(hit) for hit in hits]
         return {"passages": passages, "sources_used": ["rag"] if passages else []}

@@ -1,10 +1,10 @@
 # The legend of this repository's tables.
 #
-# Nine entries, one for every numeric column a reader meets. A column heading is a label and
-# not a definition: `recall@1` says nothing about the population it was computed over, and
-# `flipped` says nothing about what moved or in which direction that is good news. The answer
-# belongs here rather than in a variable name, so that the README, `docs/protocol.md` and the
-# reports can each point at one definition instead of writing three.
+# Nine entries, one for every numeric column of the README's tables. A column heading is a
+# label and not a definition: `recall@1` says nothing about the population it was computed
+# over, and `flipped` says nothing about what moved or in which direction that is good news.
+# The answer belongs here rather than in a variable name, so that the README,
+# `docs/protocol.md` and the reports can each point at one definition instead of writing three.
 #
 # Two of the nine measure a knob rather than a result. `threshold` is the setting the agent
 # is served with, and `in_theory` is what that setting decides; they appear in a table whose
@@ -41,8 +41,10 @@ metrics:
     direction: higher_is_better
     anchor: "1.00 — backend/reports/ablation_retrieval.json#variants.french-question.scores.recall@3"
     business_reading: >-
-      Whether the right article is within reach of the agent at all. The agent reads three
-      passages, so this is the number that says whether the synthesis had the material.
+      Whether the right article is within reach of the agent at all. The agent retrieves
+      three passages, which can come from fewer than three articles, and the prompt of the
+      synthesis carries the first two, so this number is an upper bound on how often the
+      synthesis received a correct article.
     source: "backend/scripts/run_retrieval_ablation.py, over the same 14 cases"
     uncertainty: >-
       Fourteen cases, one case worth 0.071. A value of 1.00 on a corpus of 32 articles says
@@ -65,14 +67,15 @@ metrics:
 
   threshold:
     definition: >-
-      The number of master games in the Lichess Explorer above which a position is treated
-      as theory; the agent's only conditional edge reads it.
+      The number of master games in the Lichess Explorer from which a position is treated
+      as theory (the comparison is "at least"). The theory node applies it, and the
+      conditional edge after that node routes on the result.
     unit: "master games"
     direction: target
     anchor: "1000 — backend/reports/theory_threshold_sweep.csv#threshold"
     business_reading: >-
       Where the coach stops quoting theory and starts asking the engine. Too low and it
-      quotes lines nobody plays; too high and it calls an engine on the Sicilian.
+      quotes lines masters rarely play; too high and it calls an engine on the Sicilian.
     source: "backend/src/chess_coach/config.py, field `theory_min_games`; swept by backend/scripts/sweep_theory_threshold.py"
     uncertainty: >-
       Not measured but chosen. The sweep is what puts an uncertainty on the choice: it says
@@ -80,8 +83,10 @@ metrics:
 
   in_theory:
     definition: >-
-      The number of positions of the frozen reading that the agent routes to theory at a
-      given threshold.
+      The number of positions of the frozen reading that the Explorer rule counts as
+      theory at a given threshold, which takes a recorded move and a master-game count no
+      lower than the threshold. The agent also keeps in theory a position the local opening
+      book contains, which this count leaves out.
     unit: "positions"
     direction: target
     anchor: "45 — backend/reports/theory_threshold_sweep.csv#in_theory, row threshold=1000"
@@ -126,8 +131,9 @@ metrics:
 
   p90_ms:
     definition: >-
-      The ninetieth percentile of the same timings, by linear interpolation between the two
-      neighbouring measurements.
+      The ninetieth percentile of the same timings, taken as one of the measurements with no
+      interpolation: in ascending order, the one at rank int(0.9 × n), which is the tenth of
+      twelve and the fifth of six.
     unit: "milliseconds"
     direction: lower_is_better
     anchor: "20.0 — backend/reports/latency.json#nodes.context.p90_ms"
@@ -137,12 +143,14 @@ metrics:
     source: "backend/scripts/bench_agent.py, over the same timings"
     uncertainty: >-
       A ninetieth percentile over six to twelve points is an order statistic, not an
-      estimate: it names the second-slowest measurement, and nothing beyond this run.
+      estimate: it names the third-slowest of twelve measurements, or the second-slowest of
+      six, and nothing beyond this run.
 
   citations:
     definition: >-
       The number of chess moves the language model names in its written answers, as read by
-      the parser of `backend/scripts/check_move_invention.py`.
+      the parser in `backend/src/chess_coach/evaluation/moves.py`, which
+      `backend/scripts/check_move_invention.py` calls.
     unit: "cited moves"
     direction: target
     anchor: "116 — backend/reports/move_invention.json#totals.cited"

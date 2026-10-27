@@ -9,6 +9,9 @@ from fastapi.testclient import TestClient
 
 from chess_coach.api.dependencies import get_rag_service
 from chess_coach.api.main import create_app
+from chess_coach.config import Settings
+from chess_coach.services import embeddings
+from chess_coach.services.embeddings import EmbeddingService, EmbeddingServiceError
 from chess_coach.services.milvus_store import SearchHit
 from chess_coach.services.rag_search import RagService
 
@@ -58,3 +61,24 @@ def test_vector_search_route_returns_passages() -> None:
     assert response.status_code == 200
     body = response.json()
     assert body["passages"][0]["source"] == "defense-sicilienne.md"
+
+
+def test_vector_search_answers_503_when_the_embedding_model_cannot_load(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """No network and no cache: a missing model is a missing dependency, not a crash."""
+
+    def refuse(name: str) -> None:
+        raise EmbeddingServiceError(f"Could not load the embedding model {name}")
+
+    monkeypatch.setattr(embeddings, "load_model", refuse)
+    app = create_app()
+    app.dependency_overrides[get_rag_service] = lambda: RagService(
+        embedder=EmbeddingService(Settings()), store=FakeStore()
+    )
+    client = TestClient(app)
+
+    response = client.get("/api/v1/vector-search", params={"q": "sicilienne", "top_k": 3})
+
+    assert response.status_code == 503
+    assert "embedding model" in response.json()["detail"]

@@ -1,8 +1,9 @@
-# Routing threshold — how sharply the agent's only branch depends on it
+# Routing threshold — how sharply the agent's routing branch depends on it
 
 - Explorer read on: 2026-09-07 (database `masters`)
-- Positions: 54, walked from the curated opening book at several depths, plus eight lines nobody plays
+- Positions: 54, walked from the curated opening book at several depths, plus eight named lines that masters rarely or never play
 - Served threshold: **1000** master games
+- Rule counted: the Explorer rule alone (at least one recorded move, and at least the threshold in master games). The agent's fallback on the local opening book is left out.
 
 | Threshold | In theory | Out of theory | Positions that flipped |
 |---|---|---|---|

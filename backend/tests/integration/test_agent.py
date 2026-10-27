@@ -11,9 +11,12 @@ from chess_coach.agent.state import AgentDeps
 from chess_coach.api.dependencies import get_chess_agent
 from chess_coach.api.main import create_app
 from chess_coach.config import Settings
+from chess_coach.services import embeddings
 from chess_coach.services.chess_position import STARTING_FEN
+from chess_coach.services.embeddings import EmbeddingService, EmbeddingServiceError
 from chess_coach.services.lichess import OpeningExplorerResult, TheoryMove
 from chess_coach.services.milvus_store import SearchHit
+from chess_coach.services.rag_search import RagService
 from chess_coach.services.stockfish_engine import EvaluationResult
 from chess_coach.services.youtube import VideoItem
 
@@ -86,6 +89,39 @@ def test_agent_in_theory_skips_engine_and_persists() -> None:
     assert "rag" in state["sources_used"]
     assert "Italian Game" in state["recommendation"]
     assert mongo.saved and mongo.saved[0]["fen"] == STARTING_FEN
+
+
+class UnusedStore:
+    """Never reached: the query cannot be embedded, so nothing is searched."""
+
+    def search(self, query_embedding: list[float], *, top_k: int = 3) -> list[SearchHit]:
+        raise AssertionError("the store was queried without an embedding")
+
+
+def test_agent_answers_without_passages_when_the_embedding_model_cannot_load(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The real retrieval service, with a model that cannot be loaded (no network, no cache)."""
+
+    def refuse(name: str) -> None:
+        raise EmbeddingServiceError(f"Could not load the embedding model {name}")
+
+    monkeypatch.setattr(embeddings, "load_model", refuse)
+    settings = Settings(youtube_api_key="dummy", llm_enabled=False)
+    deps = AgentDeps(
+        settings=settings,
+        theory=FakeTheory(known=True),
+        stockfish=FakeStockfish(),
+        rag=RagService(settings, embedder=EmbeddingService(settings), store=UnusedStore()),
+        youtube=FakeYoutube(),
+        mongo=FakeMongo(),
+    )
+
+    state = ChessAgent(deps).run(STARTING_FEN)
+
+    assert state["passages"] == []
+    assert "rag" not in state["sources_used"]
+    assert "Italian Game" in state["recommendation"]
 
 
 def test_agent_out_of_theory_uses_engine() -> None:

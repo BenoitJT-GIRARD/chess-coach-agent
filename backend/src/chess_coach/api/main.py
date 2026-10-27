@@ -8,8 +8,9 @@ imported by uvicorn (``chess_coach.api.main:app``).
 first request that needs it: the first player to ask a question waits ten seconds on a warm
 cache and considerably longer on a cold one, while every proxy in front of the service counts
 that as a timeout. Warming it in the background instead means the service answers its
-healthcheck immediately, keeps starting when there is no model to be had, and is ready by the
-time anyone has finished setting up a board.
+healthcheck immediately and keeps starting when there is no model to be had. The model it
+loads is the one every later search uses, and a search that arrives during the load waits
+for it to finish.
 """
 
 from __future__ import annotations

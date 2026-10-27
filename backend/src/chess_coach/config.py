@@ -1,9 +1,10 @@
 """Centralised application settings.
 
-Every tunable value (hosts, ports, API keys, model names) is read from the
-environment — never hard-coded — so the same code runs identically on a
-developer laptop and inside Docker Compose. Values are documented in
-``.env.example``.
+Settings come from the environment: the addresses and ports of the services, the API keys,
+the model names, the timeouts and the routing threshold. The same code therefore runs on a
+developer laptop and inside Docker Compose, and ``.env.example`` documents each setting. A
+few tuning values stay in the code that uses them, among them the number of passages
+retrieved per question, the number of videos, the chunk size and the model temperature.
 """
 
 from __future__ import annotations
@@ -49,8 +50,9 @@ class Settings(BaseSettings):
     # backed by 25 559 games, 1.e4 e5 2.Qh5 by 48 — read on 2026-09-07, and the counts
     # move because the database is alive.
     #
-    # Swept over a frozen reading of 54 positions, the routing does not change between
-    # 500 and 5 000: this value sits in a plateau. See data/eval/theory_threshold_sweep.md.
+    # Swept over a frozen reading of 54 positions, the Explorer rule gives the same routing
+    # at 1 000, 2 500 and 5 000, and two positions change side between 500 and 1 000: this
+    # value sits at the low end of a plateau. See reports/theory_threshold_sweep.md.
     theory_min_games: int = 1000
 
     # --- Stockfish ---
@@ -71,8 +73,9 @@ class Settings(BaseSettings):
     # while someone is still looking.
     milvus_timeout: float = Field(default=3.0, ge=0.5)
 
-    # The knowledge base is made of two folders of Markdown articles, both
-    # relative to the working directory.
+    # The knowledge base is made of two folders of Markdown articles. The defaults come
+    # from chess_coach.utils.paths; a relative path set in the environment is read from the
+    # working directory.
     #   - wikichess: articles downloaded from FICGS Wikichess, in English,
     #     not redistributed with the project: the folder is filled by
     #     scripts.fetch_wikichess;

@@ -25,7 +25,8 @@ from chess_coach.utils.paths import FIGURES_DIR, LATENCY_JSON, THRESHOLD_SWEEP_C
 
 SOURCE = "scripts/build_figures.py"
 
-#: The value `config.py` serves, and the one the sweep is read around.
+#: The value `config.py` serves by default, and the one the sweep is read around. It is
+#: written here, and a unit test holds it equal to the setting.
 SERVED_THRESHOLD = 1000
 
 

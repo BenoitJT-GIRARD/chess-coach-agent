@@ -5,9 +5,13 @@ Outputs that no single execution produced make a notebook unreadable: the counte
 each other. This script runs each notebook from a clean kernel, so the execution counters
 come out as 1..N and every output is from that one pass.
 
-    uv sync --group notebook
+    uv sync --extra dev
     uv run python scripts/run_notebooks.py
-    uv run python scripts/run_notebooks.py --check    # fail if a notebook is stale
+    uv run python scripts/run_notebooks.py --check    # fail on missing outputs or broken counters
+
+``--check`` reads the published state only: it fails when a notebook has no output or when
+its counters are not 1..N. It does not execute anything, so it cannot tell whether the
+outputs still match what the current code would print.
 
 A notebook writes nothing outside itself. What is published under ``reports/`` comes from
 the scripts, because a figure a notebook redrew is a figure no manifest can trace back to
@@ -75,7 +79,9 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--only", help="a single notebook, by file name")
     parser.add_argument(
-        "--check", action="store_true", help="run nothing; report the notebooks that are stale"
+        "--check",
+        action="store_true",
+        help="run nothing; report the notebooks with no output or with counters that are not 1..N",
     )
     arguments = parser.parse_args(argv)
 

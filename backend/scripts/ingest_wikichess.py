@@ -4,8 +4,10 @@ Usage (from the ``backend/`` folder or inside the backend container)::
 
     python -m scripts.ingest_wikichess
 
-The articles themselves are downloaded once by ``scripts.fetch_wikichess`` and
-committed with the project, so this step never needs the network.
+The Wikichess articles are not tracked by git. ``scripts.fetch_wikichess``
+downloads them into ``var/wikichess`` first, and this step reads them from disk
+with the notes of ``data/openings``. Embedding the chunks needs the embedding
+model, which is downloaded on first use when it is not in the local cache.
 """
 
 from __future__ import annotations

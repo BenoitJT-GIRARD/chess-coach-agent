@@ -114,6 +114,12 @@ ignore = [
     "N806",
 ]
 
+# The pre-commit hook runs ruff from the repository root with this file as its configuration,
+# and from there the project's own packages are not found on the default source paths. Naming
+# them keeps the import order the hook writes equal to the one the CI checks from `backend/`.
+[tool.ruff.lint.isort]
+known-first-party = ["chess_coach", "scripts", "tests"]
+
 # A notebook spreads its imports across cells: the first one sets the environment up, and the
 # ones that follow sit next to the code that uses them, which is what makes a notebook
 # readable. It is linted, and these three rules are the ones that would ask it to stop.
@@ -138,8 +144,7 @@ markers = [
 ]
 # Warnings are errors. Three categories used to be silenced wholesale, which on a stack
 # made of six fast-moving libraries meant never hearing that one of them was about to
-# change its API. Every exemption below names the message it silences and the library it
-# comes from.
+# change its API. No exemption is listed: a warning fails the test that raises it.
 filterwarnings = ["error"]
 
 [tool.coverage.run]
@@ -183,6 +188,6 @@ directory = "var/coverage-html"
 
 [tool.bandit]
 exclude_dirs = ["tests", "notebooks", ".venv"]
-# B101: assert is used for invariants in scripts/notebooks, not security checks.
-# B113: external HTTP calls always pass an explicit timeout in the services layer.
+# B101 is skipped: assert is used for invariants in scripts/notebooks, not security checks.
+# B113, an HTTP request without a timeout, stays active.
 skips = ["B101"]

@@ -104,12 +104,17 @@ export class CoachPanelComponent {
     return total > 0 ? total.toLocaleString('fr-FR') : '';
   }
 
-  /** Readable name for one of the tools the agent used. */
+  /**
+   * Readable name for one of the tools the agent used.
+   *
+   * `theory` covers the Lichess Explorer and the local opening book, and `rag` covers the
+   * Wikichess articles and the notes written in French, so neither label names one source.
+   */
   sourceLabel(source: string): string {
     const labels: Record<string, string> = {
-      theory: 'Théorie Lichess',
+      theory: 'Théorie des ouvertures',
       engine: 'Moteur Stockfish',
-      rag: 'Base Wikichess',
+      rag: 'Base de connaissances',
       youtube: 'API YouTube',
       llm: 'Modèle de langage',
     };

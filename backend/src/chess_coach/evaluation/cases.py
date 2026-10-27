@@ -22,7 +22,11 @@ DEFAULT_PATH = RETRIEVAL_CASES
 
 @dataclass(frozen=True, slots=True)
 class RetrievalCase:
-    """One question, and the articles that answer it."""
+    """One opening, and the articles that answer it.
+
+    ``question`` holds a French question of the kind a player would type. No variant of the
+    ablation sends it: every query is built from ``opening_name`` and ``eco``.
+    """
 
     id: str
     opening_name: str

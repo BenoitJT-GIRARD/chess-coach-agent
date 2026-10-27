@@ -9,8 +9,9 @@ Sequential and explicit on purpose:
 
 The knowledge base has two folders. ``var/wikichess`` holds the articles
 downloaded from FICGS Wikichess, which are not redistributed with this project:
-the folder holds nothing but its manifest until ``scripts.fetch_wikichess`` has
-run. ``data/openings`` holds the complementary notes written in French for young
+the folder does not exist until ``scripts.fetch_wikichess`` has run, and the
+index of what it should hold is tracked as ``reports/wikichess_manifest.json``.
+``data/openings`` holds the complementary notes written in French for young
 players. Both are indexed in the same collection, and every chunk keeps the
 name of the folder it came from, so a retrieved passage can always be traced
 back to its origin.
@@ -37,8 +38,8 @@ def knowledge_directories(settings: Settings) -> list[Path]:
 def _require_downloaded_corpus(directory: Path) -> None:
     """Fail early, and say why, when the Wikichess corpus has not been downloaded.
 
-    Indexing the eleven French notes alone would succeed, answer, and quietly score a
-    third of what the measurements report.
+    Indexing the eleven French notes alone would succeed and answer every question, from
+    a corpus other than the one the measurements were taken on.
     """
 
     if not WIKICHESS_MANIFEST.is_file() or any(directory.glob("*.md")):

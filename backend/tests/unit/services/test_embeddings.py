@@ -11,12 +11,16 @@ The fake model records what it was asked, which is the only way to say that from
 
 from __future__ import annotations
 
+import sys
+import types
 from dataclasses import dataclass, field
 from typing import Any
 
 import numpy as np
+import pytest
 
-from chess_coach.services.embeddings import EmbeddingService
+from chess_coach.services import embeddings
+from chess_coach.services.embeddings import EmbeddingService, EmbeddingServiceError
 
 
 @dataclass
@@ -74,3 +78,48 @@ def test_a_single_text_comes_back_as_one_vector_rather_than_a_batch_of_one() -> 
 def test_the_configured_dimension_is_the_one_the_collection_is_built_with() -> None:
     """`MilvusStore.ensure_collection` declares this number; a mismatch is a refused insert."""
     assert EmbeddingService(FakeSettings(), model=FakeModel()).dim == 384
+
+
+@pytest.fixture
+def library(monkeypatch: pytest.MonkeyPatch) -> list[str]:
+    """Stand in for sentence-transformers, record each load, and start with no model loaded."""
+    loads: list[str] = []
+
+    class FakeSentenceTransformer(FakeModel):
+        def __init__(self, name: str) -> None:
+            super().__init__()
+            loads.append(name)
+
+    monkeypatch.setitem(
+        sys.modules,
+        "sentence_transformers",
+        types.SimpleNamespace(SentenceTransformer=FakeSentenceTransformer),
+    )
+    monkeypatch.setattr(embeddings, "_MODELS", {})
+    return loads
+
+
+def test_every_instance_shares_the_model_the_first_one_loaded(library: list[str]) -> None:
+    """The warm-up at start-up loads the model once for the agent and the search route."""
+    EmbeddingService(FakeSettings()).embed_one("warm-up")
+    EmbeddingService(FakeSettings()).embed_one("the Ruy Lopez")
+    EmbeddingService(FakeSettings()).embed(["a", "b"])
+
+    assert library == [FakeSettings.embedding_model]
+
+
+def test_a_model_that_cannot_load_raises_the_service_s_own_error(
+    library: list[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """No network and no cache: the callers get one exception they can turn into a 503."""
+
+    def refuse(name: str) -> None:
+        raise OSError("offline, and nothing in the cache")
+
+    monkeypatch.setattr(
+        sys.modules["sentence_transformers"], "SentenceTransformer", refuse, raising=False
+    )
+
+    with pytest.raises(EmbeddingServiceError, match="offline"):
+        EmbeddingService(FakeSettings()).embed_one("the Ruy Lopez")
+    assert embeddings._MODELS == {}, "a failed load is not remembered, the next call retries"

@@ -7,7 +7,8 @@ Measured 2026-09-08 · model `gpt-4o-mini` · 21 positions, 2 passes, 42 calls.
 | 116 | 68 | 1 | 2 | 45 |
 
 > **How to read it.** One row, and the columns say where each cited move came from. `Given in
-> the prompt` is a move a tool supplied. `Legal, not given` is a move that exists in the
+> the prompt` is a move the prompt contained, whether a tool's output carried it or it was among
+> the twelve legal moves listed for the position. `Legal, not given` is a move that exists in the
 > position and reached the answer from somewhere else. `No such move` could not be played at
 > all. `Told as a line` is the opening's own sequence quoted behind its move number.
 
@@ -45,4 +46,3 @@ Unfiltered reading, counting every square-looking token as a move, including the
   ```
   Les Blancs ont joué Qh5 pour attaquer le pion en e5, et les Noirs doivent maintenant défendre leur position tout en cherchant à se développer.
   ```
-

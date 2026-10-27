@@ -26,11 +26,11 @@ def french_question(case: RetrievalCase) -> str:
 
 
 def english_verbose(case: RetrievalCase) -> str:
-    """The padded English wording the agent used before.
+    """A padded English wording, close to the one the agent sent before.
 
-    Its generic words — chess, opening, ideas, plans, moves — are exactly the vocabulary
-    every article of the corpus shares, which is how it came to return the most general
-    ones.
+    Its generic words (chess, opening, ideas, plans, moves) say nothing about the opening
+    asked for. In the ablation of 2026-09-15 it put the same article first in seven of the
+    fourteen cases, `wikichess/00045`, whose header gives the moves 1.e4 e5 2.Nf3 Nc6 3.Bc4.
     """
 
     return f"chess opening {case.opening_name}: main ideas, plans and typical moves"

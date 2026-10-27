@@ -4,12 +4,13 @@ A stack of six containers should say what one question costs and which of the fo
 external calls dominates. It is the first number a reader looks for, and the repository
 had none.
 
-The language model is left **off**: the agent then falls back on its deterministic
-template. Timing a billed call would make the bench cost money, and the variance of a
-third-party endpoint would swamp the four nodes this is meant to compare.
+The synthesis node is left out. The bench times the four other nodes through the services
+they call, and neither the language model nor the template runs. Timing a billed call would
+make the bench cost money, and the variance of a third-party endpoint would swamp the four
+nodes this is meant to compare.
 
     docker compose up -d
-    LLM_ENABLED=false uv run python -m scripts.bench_agent
+    docker compose exec backend python -m scripts.bench_agent
 """
 
 from __future__ import annotations
@@ -97,9 +98,9 @@ def main() -> None:
     payload = {
         "measured": datetime.now(UTC).date().isoformat(),
         "note": (
-            "Language model disabled: the agent answers from its deterministic template. "
-            "Timing a billed call would make the bench cost money and its variance would "
-            "swamp the local nodes."
+            "The synthesis node is not timed: the services behind the four other nodes are "
+            "called directly, and no language model is called. Timing a billed call would "
+            "make the bench cost money and its variance would swamp the local nodes."
         ),
         "positions": [name for name, _ in LINES],
         "repeats": REPEATS,

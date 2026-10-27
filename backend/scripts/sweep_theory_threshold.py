@@ -50,12 +50,14 @@ def main() -> None:
 def render(payload: dict, rows: list[dict], room: dict, served: int) -> str:
     n = len(payload["positions"])
     lines = [
-        "# Routing threshold — how sharply the agent's only branch depends on it",
+        "# Routing threshold — how sharply the agent's routing branch depends on it",
         "",
         f"- Explorer read on: {payload['read_on']} (database `{payload['database']}`)",
         f"- Positions: {n}, walked from the curated opening book at several depths, plus "
-        "eight lines nobody plays",
+        "eight named lines that masters rarely or never play",
         f"- Served threshold: **{served}** master games",
+        "- Rule counted: the Explorer rule alone (at least one recorded move, and at least the "
+        "threshold in master games). The agent's fallback on the local opening book is left out.",
         "",
         "| Threshold | In theory | Out of theory | Positions that flipped |",
         "|---|---|---|---|",

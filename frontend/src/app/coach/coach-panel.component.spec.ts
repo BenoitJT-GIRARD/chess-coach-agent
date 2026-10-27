@@ -162,8 +162,8 @@ describe('CoachPanelComponent', () => {
     fixture.detectChanges();
 
     const rendered = text();
-    expect(rendered).toContain('Théorie Lichess');
-    expect(rendered).toContain('Base Wikichess');
+    expect(rendered).toContain('Théorie des ouvertures');
+    expect(rendered).toContain('Base de connaissances');
     expect(rendered).toContain('Modèle de langage');
   });
 

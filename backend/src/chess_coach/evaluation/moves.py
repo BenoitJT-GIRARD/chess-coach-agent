@@ -34,6 +34,7 @@ move of the opening's sequence, cited behind its number).
 from __future__ import annotations
 
 import re
+from collections.abc import Iterable, Iterator
 from dataclasses import dataclass
 
 import chess
@@ -98,14 +99,9 @@ class Citation:
     notation: str
 
 
-def cited_tokens(text: str, *, strict: bool = False) -> list[Token]:
-    """Every move-looking token of ``text``, in order.
+def _scan(text: str, *, strict: bool) -> Iterator[tuple[Token, int, int]]:
+    """Every move-looking token of ``text``, with where it starts and ends."""
 
-    ``strict`` keeps the bare squares that read as places. It is the
-    upper bound of what the answer could be accused of citing.
-    """
-
-    tokens: list[Token] = []
     previous_end = -1
     previous_was_line = False
     for match in TOKEN_RE.finditer(text):
@@ -117,9 +113,18 @@ def cited_tokens(text: str, *, strict: bool = False) -> list[Token]:
             LINE_CONTINUATION_RE.match(text[previous_end : match.start()])
         )
         is_line = continues_line or bool(LINE_REFERENCE_RE.search(before))
-        tokens.append(Token(token, is_line))
+        yield Token(token, is_line), match.start(), match.end()
         previous_end, previous_was_line = match.end(), is_line
-    return tokens
+
+
+def cited_tokens(text: str, *, strict: bool = False) -> list[Token]:
+    """Every move-looking token of ``text``, in order.
+
+    ``strict`` keeps the bare squares that read as places. It is the
+    upper bound of what the answer could be accused of citing.
+    """
+
+    return [token for token, _, _ in _scan(text, strict=strict)]
 
 
 def resolve(board: chess.Board, token: str) -> tuple[str | None, str]:
@@ -145,27 +150,48 @@ def resolve(board: chess.Board, token: str) -> tuple[str | None, str]:
     return None, ""
 
 
-def offered_moves(board: chess.Board, prompt: str) -> set[str]:
+def offered_moves(
+    board: chess.Board, prompt: str, *, within: tuple[int, int] | None = None
+) -> set[str]:
     """The moves the prompt puts in front of the model, as English SAN.
 
     Read from the prompt itself rather than from the state, so that whatever a node adds
     later — a passage quoting a line, a move named in an article — counts as given. The
     question is what the model was shown, not what we meant to show it.
+
+    ``within`` keeps only the tokens that lie between those two offsets of ``prompt``. They
+    are still read in the context of the whole prompt, so a square named as a place at the
+    start of the stretch is dropped exactly as it would be in a reading of the whole.
     """
 
+    start, end = within or (0, len(prompt))
     offered = set()
-    for token in cited_tokens(prompt):
+    for token, token_start, token_end in _scan(prompt, strict=False):
+        if token_start < start or token_end > end:
+            continue
         san, _ = resolve(board, token.text)
         if san:
             offered.add(san)
     return offered
 
 
-def classify(fen: str, answer: str, prompt: str, *, strict: bool = False) -> list[Citation]:
-    """Every move cited by ``answer``, judged against ``prompt`` and against the board."""
+def classify(
+    fen: str,
+    answer: str,
+    prompt: str,
+    *,
+    strict: bool = False,
+    withheld_moves: Iterable[str] = (),
+) -> list[Citation]:
+    """Every move cited by ``answer``, judged against ``prompt`` and against the board.
+
+    ``withheld_moves`` are moves the prompt carried in text that a saved copy of it no longer
+    holds, read from that text before it was removed. They count as given, exactly as they
+    did when the prompt was whole.
+    """
 
     board = chess.Board(fen)
-    offered = offered_moves(board, prompt)
+    offered = offered_moves(board, prompt) | set(withheld_moves)
 
     citations = []
     for token in cited_tokens(answer, strict=strict):

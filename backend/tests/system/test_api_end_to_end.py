@@ -72,10 +72,13 @@ def service(tmp_path_factory: pytest.TempPathFactory) -> Iterator[str]:
         # Every external address points somewhere closed. That is the case under test.
         "MILVUS_HOST": "127.0.0.1",
         "MILVUS_PORT": "1",
-        "MONGO_URI": "mongodb://127.0.0.1:1",
+        "MONGODB_URI": "mongodb://127.0.0.1:1",
         "LICHESS_TOKEN": "",
         "YOUTUBE_API_KEY": "",
         "LLM_API_KEY": "",
+        # The embedding model is read from the local Hugging Face cache or not at all. A
+        # download would make the search wait on the network, and the test would measure it.
+        "HF_HUB_OFFLINE": "1",
     }
     # A file, because no thread here is reading the child's output, and an unread pipe
     # eventually stops the process that writes into it.
@@ -175,7 +178,8 @@ def test_a_route_that_needs_a_service_fails_as_a_status_code(service: str) -> No
 
     The point is the second half: after the failure, the process is still serving. A route
     that takes the whole application down with it when a dependency is missing is the
-    failure this tier exists to catch.
+    failure this tier exists to catch. The answer is 503 whether the embedding model is in
+    the local cache (Milvus refuses the search) or not (the model cannot be loaded).
     """
     status, _ = _get(f"{service}/vector-search?q=ruy%20lopez&top_k=2")
 

@@ -32,7 +32,7 @@ import hashlib
 import json
 import os
 import shutil
-import subprocess
+import subprocess  # nosec B404 - git, the browser and taskkill, each with an argv written here
 import sys
 import time
 import urllib.error
@@ -152,37 +152,11 @@ CAPTURES: tuple[Capture, ...] = (
             "the nominal answer, at the top of the panel where a reader lands: the opening "
             "named with its ECO code, the summary, the move most played in master games with "
             "its count, the theoretical moves and the reference games. The retrieved passage "
-            "is below the fold here and visible in the twin capture"
+            "starts at the bottom edge of the frame"
         ),
         data_source="own",
         ready_selector="app-coach-panel .recommendation",
         steps=(("open", 'mat-chip:has-text("Partie espagnole")', ""),),
-        paired_with="coach-out-of-theory",
-        depends_on=(
-            "../frontend/src/app/coach/coach-panel.component.html",
-            "src/chess_coach/agent/graph.py",
-        ),
-    ),
-    Capture(
-        name="coach-out-of-theory",
-        base_url=INTERFACE_URL,
-        served_by=COMPOSE,
-        route="/",
-        engine="playwright",
-        app_state=STATE + ", the board set to 1.e4 e5 2.Qh5 from the demo row",
-        demonstrates_behaviour=(
-            "the same screen one branch later: the master database does not reach this "
-            "position, so the theory panel says so and the engine evaluation takes its "
-            "place, which is the branch the routing threshold decides"
-        ),
-        data_source="own",
-        ready_selector="app-coach-panel .recommendation",
-        steps=(
-            ("open", 'mat-chip:has-text("Hors théorie")', ""),
-            # The engine block is what replaces the theory here, and it sits below the fold.
-            ("scroll", "app-coach-panel .block.engine", ""),
-        ),
-        paired_with="coach-in-theory",
         depends_on=(
             "../frontend/src/app/coach/coach-panel.component.html",
             "src/chess_coach/agent/graph.py",
@@ -206,7 +180,7 @@ def prepare() -> None:
 
     probe = f"{BASE_URL}/api/v1/vector-search?q=ruy%20lopez&top_k=1"
     try:
-        with urllib.request.urlopen(probe, timeout=60) as answer:
+        with urllib.request.urlopen(probe, timeout=60) as answer:  # nosec B310 - BASE_URL and a route of this file
             passages = json.loads(answer.read().decode("utf-8"))["passages"]
     except (urllib.error.URLError, OSError, KeyError, json.JSONDecodeError) as exc:
         raise SystemExit(f"the vector store did not answer ({exc})") from exc
@@ -223,7 +197,7 @@ def prepare() -> None:
 def _answers(url: str) -> bool:
     """Whether something is already serving that URL, right now."""
     try:
-        with urllib.request.urlopen(url, timeout=1) as answer:
+        with urllib.request.urlopen(url, timeout=1) as answer:  # nosec B310 - a local URL built from this file's constants
             return answer.status < 500
     except (urllib.error.URLError, OSError):
         return False
@@ -239,7 +213,7 @@ def wait_until_healthy(url: str, *, timeout: float = 90.0) -> None:
     last: Exception | None = None
     while time.monotonic() < deadline:
         try:
-            with urllib.request.urlopen(url, timeout=2) as answer:
+            with urllib.request.urlopen(url, timeout=2) as answer:  # nosec B310 - a local URL built from this file's constants
                 if answer.status < 500:
                     return
         except (urllib.error.URLError, OSError) as exc:  # not up yet
@@ -270,7 +244,7 @@ class Serving:
                 f"{self.health} already answers: stop what is listening before capturing, "
                 "or the picture will be of that and not of this build"
             )
-        self.process = subprocess.Popen(
+        self.process = subprocess.Popen(  # nosec B603 - SERVE_COMMAND, a literal of this file
             list(self.command), cwd=ROOT_DIR, stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT
         )
         wait_until_healthy(self.health)
@@ -282,7 +256,7 @@ class Serving:
         if self.process is None:
             return
         if os.name == "nt":
-            subprocess.run(
+            subprocess.run(  # nosec B603 B607 - taskkill on the pid of our own child
                 ["taskkill", "/F", "/T", "/PID", str(self.process.pid)],
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
@@ -321,7 +295,7 @@ def _chrome_binary() -> str:
 def by_chrome(capture: Capture) -> None:
     """One pass, headless. `--virtual-time-budget` is what makes a JavaScript page render."""
     width, height = VIEWPORT
-    subprocess.run(
+    subprocess.run(  # nosec B603 - the browser CHROME_PATH names, with flags written here
         [
             _chrome_binary(),
             "--headless",
@@ -391,7 +365,7 @@ ENGINES = {"chrome": by_chrome, "playwright": by_playwright}
 
 def _git_revision() -> str | None:
     try:
-        done = subprocess.run(
+        done = subprocess.run(  # nosec B603 B607 - git from the PATH, one read-only command
             ["git", "rev-parse", "HEAD"], cwd=ROOT_DIR, capture_output=True, text=True, check=True
         )
     except (OSError, subprocess.CalledProcessError):

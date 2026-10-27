@@ -74,7 +74,10 @@ def test_neither_figure_claims_a_spread_it_did_not_draw(figures: Path) -> None:
 
 
 def test_the_served_threshold_is_the_one_the_settings_serve() -> None:
-    """The dotted line on the first figure marks a value `config.py` decides, not the script."""
+    """The dotted line on the first figure marks the value `config.py` serves.
+
+    The script writes the number itself, so this test is what keeps the two equal.
+    """
     from chess_coach.config import Settings
 
     assert Settings().theory_min_games == build_figures.SERVED_THRESHOLD

@@ -16,9 +16,10 @@ also gives us, for free, the move sequence and the FEN of each article.
 
 The articles themselves are not redistributed; `docs/data-source.md` quotes the
 clause that forbids it. What the repository keeps of the corpus is the manifest
-this script writes — which files a download produces, and where
-each one comes from — so the evaluation labels can be checked without the
-articles being there.
+this script writes: every article file in the output folder after the download,
+and where each one comes from, so the evaluation labels can be checked without
+the articles being there. The folder is not emptied first, so a file left by an
+earlier download stays listed.
 
 Usage (from the ``backend/`` folder)::
 
@@ -59,10 +60,9 @@ FOOTER_SEPARATOR = "============"
 
 # The index of the corpus, written beside the articles and versioned in their place.
 MANIFEST_ABOUT = (
-    "Index of the Wikichess corpus. The articles themselves are not redistributed, for "
-    "the licence reason docs/data-source.md sets out. Run "
-    "`python -m scripts.fetch_wikichess` to download them again into `backend/var/`, "
-    "which git ignores."
+    "Index of the Wikichess corpus. The articles themselves are not redistributed: FICGS "
+    "reserves the rights on the text of its site. Run `python -m scripts.fetch_wikichess` "
+    "to download them again into `backend/var/`, which git ignores."
 )
 
 

@@ -6,7 +6,8 @@ and frozen, with its date, in ``data/eval/theory_positions.json``. Everything do
 reads that file and touches no network.
 
 The positions are walked from the curated opening book — main lines at several depths —
-plus a handful of lines nobody plays, which is where a routing threshold earns its keep.
+plus a handful of lines that masters rarely or never play, which is where a routing
+threshold earns its keep.
 
     LICHESS_TOKEN=... uv run python -m scripts.sample_theory_positions
 """

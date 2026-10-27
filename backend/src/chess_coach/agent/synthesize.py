@@ -214,6 +214,17 @@ SYSTEM_PROMPT = (
 )
 
 
+#: How many of the retrieved passages the prompt carries, and how many characters of each.
+PROMPT_PASSAGES = 2
+PASSAGE_CHARS = 400
+
+
+def passage_in_prompt(passage: dict) -> str:
+    """A retrieved passage as the prompt carries it: on one line, and cut."""
+
+    return passage["text"].replace("\n", " ").strip()[:PASSAGE_CHARS]
+
+
 def build_llm_prompt(state: AgentState) -> str:
     """Assemble everything the nodes collected into a single prompt."""
 
@@ -270,9 +281,8 @@ def build_llm_prompt(state: AgentState) -> str:
     if passages:
         lines.append("")
         lines.append("Extraits de la base de connaissances :")
-        for passage in passages[:2]:
-            text = passage["text"].replace("\n", " ").strip()
-            lines.append(f"  - ({passage['opening']}) {text[:400]}")
+        for passage in passages[:PROMPT_PASSAGES]:
+            lines.append(f"  - ({passage['opening']}) {passage_in_prompt(passage)}")
 
     if state.get("videos"):
         lines.append("")

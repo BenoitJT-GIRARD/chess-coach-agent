@@ -157,3 +157,26 @@ def test_the_summary_counts_each_verdict() -> None:
         "line_reference": 1,
         "in_french_notation": 1,
     }
+
+
+def test_a_move_from_a_withheld_passage_still_counts_as_given() -> None:
+    """A saved prompt without its passage hands the passage's moves over beside it."""
+
+    answer = "Le coup Qe7 protège le pion."
+
+    assert [c.verdict for c in classify(ITALIAN, answer, PROMPT)] == ["legal"]
+    assert [c.verdict for c in classify(ITALIAN, answer, PROMPT, withheld_moves={"Qe7"})] == [
+        "offered"
+    ]
+
+
+def test_one_stretch_of_the_prompt_is_read_in_the_context_of_the_whole() -> None:
+    """« en e7 » names a place inside the stretch, as it would in a reading of the whole."""
+
+    prompt = PROMPT + "  - (Giuoco Piano) La dame en e7 soutient le centre, et Qe7 suit souvent.\n"
+    start = prompt.index("La dame")
+
+    stretch = offered_moves(chess.Board(ITALIAN), prompt, within=(start, len(prompt)))
+
+    assert stretch == {"Qe7"}
+    assert offered_moves(chess.Board(ITALIAN), prompt) >= {"Qe7", "Nf6", "Bc5"}
