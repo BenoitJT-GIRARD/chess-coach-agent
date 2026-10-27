@@ -1,45 +1,49 @@
 # Frontend: the Angular interface
 
-An interactive chessboard and the coach's answer panel. It talks to the FastAPI backend
-through a relative path (`/api/v1`), which lets the same build run behind the
-container's nginx proxy and behind the `ng serve` dev proxy without a rebuild.
+This directory holds an interactive chessboard and the panel that displays the coach's answer.
+The interface calls the FastAPI backend on a relative path (`/api/v1`), so the same build works
+behind the nginx proxy of the container and behind the proxy of `ng serve`.
 
 ## What it is built on
 
-Two public libraries, and the attribution matters more than the line count:
+The interface relies on two public libraries:
 
-- **[ngx-chess-board](https://www.npmjs.com/package/ngx-chess-board)**: the board itself,
-  with its `[size]`, `[lightTileColor]`, `[darkTileColor]` inputs and its `(moveChange)`
-  output. Version 3.0.0 ships sources only on npm, so the build fixes the Ivy build of
-  2.2.3, which Angular 17 accepts through legacy peer resolution.
-- **[Angular Material](https://material.angular.io/)**: toolbar, cards, buttons, chips,
-  tooltips and the loading indicator.
+- **[ngx-chess-board](https://www.npmjs.com/package/ngx-chess-board)**: the board itself, used
+  through its `[size]`, `[lightTileColor]` and `[darkTileColor]` inputs and its `(moveChange)`
+  output. According to a comment in `.github/workflows/ci.yml`, version 3.0.0 ships sources
+  only, so the lock file pins 2.2.3, an Ivy build that installs on Angular 17 with legacy peer
+  resolution (`.npmrc` turns it on).
+- **[Angular Material](https://material.angular.io/)**: the toolbar, icons, cards, buttons,
+  chips, tooltips, a divider and the loading spinner.
 
-The board is also what holds the framework at Angular 17. `npm audit` lists four advisories
-against Angular itself, fixed in Angular 20 only, and ngx-chess-board declares Angular 17 as
-its peer. Moving would mean replacing the board. The interface runs on the machine that runs
-the API and is not deployed anywhere, which is why it stays where it is for now. The build
-tools' remaining advisories have the same cause: their fixes ship with Angular's next majors.
+The board also keeps the framework on Angular 17. When the lock file was last raised (commit
+`9b2e399`, 2026-10-10), this README recorded that `npm audit` listed four advisories against
+Angular itself, fixed only in Angular 20, and advisories against the build tools whose fixes ship
+with later major versions of Angular. The audit output is not stored in the repository. The
+installed ngx-chess-board 2.2.3 declares Angular 13 as its peer (`^13.2.0`) and runs on Angular
+17 only through legacy peer resolution, so moving to Angular 20 would mean replacing the board.
+The interface runs on the same machine as the API and is not deployed, so it stays on Angular 17
+for now.
 
-The Material theme is built on a navy and a gold (`src/styles.scss`). The icon font is
-bundled through the `material-icons` package rather than loaded from Google Fonts, so the
-interface stays usable with no internet access, which is also what a demonstration on a
-conference network needs.
+The Material theme uses a deep blue and an amber, defined in `src/styles.scss` and exposed to the
+components as `--navy` and `--gold`. The icon font comes from the `material-icons` package and is
+bundled with the application, so the interface works without internet access, on a conference
+network for example.
 
 ## Layout
 
 ```
 src/app/
 ├── app.component.*              # shell: the title bar
-├── chessboard/                  # the board, its controls, the demo positions
+├── chessboard/                  # the board, its controls, the demo positions, the history
 ├── coach/                       # the answer panel
 ├── models/agent.models.ts       # types mirroring the API responses
 └── services/agent.service.ts    # HTTP calls to the backend
 ```
 
-The split is deliberately blunt: `chessboard` holds the state of the game and calls the
-backend, `coach-panel` only renders what it is handed. A panel that fetched its own data
-would make the board's state and the panel's state two things that can disagree.
+`chessboard` holds the state of the game and calls the backend. `coach-panel` displays what it
+receives through its inputs. If the panel fetched its own data, the board and the panel could
+hold two different states.
 
 ## Running it
 
@@ -48,8 +52,8 @@ npm install
 npm start          # http://localhost:4200, proxying to http://localhost:8000
 ```
 
-The backend has to be running alongside it: see `../backend/README.md`, or the
-`docker compose up` described at the root.
+The backend must be running as well: see `../backend/README.md`, or start the whole stack with
+the `docker compose up` described in the root README.
 
 ## Tests
 
@@ -57,9 +61,10 @@ The backend has to be running alongside it: see `../backend/README.md`, or the
 npm test -- --watch=false --browsers=ChromeHeadless
 ```
 
-They cover the HTTP service and the answer panel: loading and error states, the detected
-opening, the theoretical moves, the reference games, and the list of tools the agent
-actually used.
+The tests cover the HTTP service, the answer panel (loading and error states, the detected
+opening, the move put forward, the theoretical moves, the reference games, the engine
+evaluation and the tools the agent used), the board component (demonstration positions and
+history) and the title bar.
 
 ## Building the image
 
@@ -67,5 +72,5 @@ actually used.
 docker build -t chess-coach-frontend .
 ```
 
-The `Dockerfile` builds the application with Node, then serves it with nginx, which
-forwards `/api/` to the backend.
+The `Dockerfile` builds the application with Node 20, then serves it from an unprivileged nginx
+image on port 8080. nginx forwards `/api/` to the backend.

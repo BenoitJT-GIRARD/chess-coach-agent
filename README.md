@@ -1,6 +1,6 @@
 <h1 align="center">Chess opening coach</h1>
 
-<p align="center">A chess agent that routes a position to a database, an engine or a corpus before a model writes</p>
+<p align="center">A LangGraph chess-opening coach that looks up its facts before a language model writes the answer</p>
 
 <p align="center">
   <img src="docs/badges/python.svg" alt="Python 3.12">
@@ -10,43 +10,51 @@
 </p>
 
 <!-- source: docs/images/MANIFEST.json -->
-![The coach on the Ruy Lopez: the opening named with its ECO code, the move most played in master games with its count, the theoretical moves and the reference games, each under the source it came from](docs/images/coach-in-theory.png)
+![The coach on the Ruy Lopez: the opening and its ECO code, a short presentation, the next move with the number of master games that chose it, then the theoretical moves and the reference games](docs/images/coach-in-theory.png)
 
-**Project status** — finished, and archived in a runnable state. It coaches club players on
-their chess openings. Each figure printed here was taken from an artefact this repository
-tracks, and each of those artefacts is the output of one script; the workflows recompute
-none of them. The whole stack comes up with one
-`docker compose up`: six services, of which the vector store is the slowest to be ready. The
-reference articles are downloaded by the reader, because they belong to their authors.
+<div align="justify">
+
+**Project status** — finished and archived. The coach is meant for club players learning their
+openings. The stack starts with one `docker compose up`, which brings up six services, and the
+vector store takes the longest to become ready. The measured numbers on this page come from
+result files the repository tracks, each written by one script, with these exceptions. The
+scores of the first published retrieval table come from the git history (commit `9199be9`).
+Four counts were computed by hand from tracked files: the 37 positions the local book keeps in
+theory, the empty range from 915 to 5 244 master games, the split of the moves present in the
+prompt into 53 and 15, and the 22 prompts and 36 citations that carried the article header. The
+CI workflow is started by hand and runs the linters and the tests. It does not recompute the
+published tables. The last recorded run, on 2026-10-10, reproduced the routing sweep and the
+move-invention tables (`backend/reports/run-evidence.json`). Readers download the reference
+articles themselves, because FICGS reserves the rights to their text.
 
 ## The problem
 
-A club coach looks at a position and says one of three different things. *This is the Ruy
-Lopez, and here is the idea behind it.* Or: *this is a sideline, nobody plays it, let us see
-what the engine thinks.* Or: *here is a video that explains it better than I will.*
+A club coach asked about a position usually gives one of three answers. In a known opening, the
+coach names it and explains the idea behind it. In a sideline that strong players avoid, the
+coach says so and looks at what an engine recommends. When a video explains the line well, the
+coach points the player to it.
 
-A language model asked the same question answers all three at once, fluently, and invents the
-move counts. This repository is arranged against that failure. The model writes well enough;
-what it lacks is any signal of which of the three cases it is looking at, and any source for
-the figures it will quote regardless.
+The design of this repository starts from an assumption that it does not test: a language model
+given the same position would mix the three answers and could invent the move counts it quotes.
+Its writing would be good enough. It would have no signal telling it which of the three cases
+applies, and no source for the counts.
 
-So the model here is the last node of a graph that has already decided. Theory comes from a
-database of master games, the evaluation from an engine, the explanation from a corpus of
-articles, the videos from a search API. The model is handed those facts and asked to write
-four sentences.
+In this repository the graph gathers the facts first, and the model writes from them. The theory
+comes from a database of master games, the evaluation from an engine, the explanation from a
+corpus of articles, and the videos from a search API. The model receives those facts and writes
+a presentation of the opening in two or three sentences and a recommendation in four to six.
 
-That leaves two decisions for the system to take, and this repository is built around
-measuring them: when a position is still theory, and how to ask a knowledge base a question
-it can answer.
+The system still has two decisions to make, and the repository measures both: when a position
+counts as theory, and how to word the query sent to the knowledge base.
 
 ## What it does
 
-The project runs as six containers under Docker Compose, started with one command. A
-LangGraph agent routes a position through four sources and writes the answer.
+The project runs as six containers under Docker Compose. A LangGraph agent collects facts about a
+position from four sources and then writes the answer.
 
 ```mermaid
 flowchart LR
-    TH["identify, then theory<br/>Lichess master games"] --> COND{"master games seen<br/>≥ theory_min_games?"}
+    TH["identify, then theory<br/>Lichess master games, local book"] --> COND{"master games ≥ theory_min_games,<br/>or a position of the local book?"}
     COND -->|"yes, still theory"| CTX["context<br/>32 articles in Milvus"]
     COND -->|"no, it has left theory"| ENG["engine<br/>Stockfish"]
     ENG --> CTX
@@ -54,53 +62,49 @@ flowchart LR
 ```
 
 - **Theory**: the [Lichess Opening Explorer](https://lichess.org/api#tag/Opening-Explorer)
-  over the master-games database, with a local opening book behind it so the agent still
-  answers without a token.
-- **Engine**: [Stockfish](https://stockfishchess.org/), called only once the position has
-  left theory.
+  over the master-games database. A local opening book of seventeen lines answers when no token
+  is set or when the call fails, so the agent still answers without a token.
+- **Engine**: [Stockfish](https://stockfishchess.org/), called only when the position is out of
+  theory.
 - **Context**: retrieval over 32 articles indexed in [Milvus](https://milvus.io/):
   21 [Wikichess](https://ficgs.com/wikichess.html) pages in English and 11 notes written in
-  French for a young player. The downloaded pages stay out of this repository for a licence
-  reason `docs/data-source.md` sets out; one command fetches them again.
-- **Videos**: the YouTube Data API.
-- **Synthesis**: an OpenAI-compatible model turns those facts, and only those, into four
-  sentences. Without a key, or when the call fails, a deterministic French template takes
-  over and the agent still answers.
+  French for young players. The downloaded pages are kept out of this repository for a licence
+  reason given in `docs/data-source.md`, and one command downloads them again.
+- **Videos**: a search through the YouTube Data API.
+- **Synthesis**: an OpenAI-compatible model writes the presentation and the recommendation, with
+  an instruction to use only those facts. A deterministic French template writes them when no
+  key is set, when `LLM_ENABLED` is false, or when the call fails, so the agent always answers.
 
-Every analysis is written to MongoDB, so the last positions looked at come back in the
-interface.
-
-When the position is not theory, the same screen changes source and says so:
-
-<!-- source: docs/images/MANIFEST.json -->
-![The same interface on 1.e4 e5 2.Qh5: the position is reported as out of book, Stockfish's evaluation takes the place of the statistics, and the retrieved passage is shown below it](docs/images/coach-out-of-theory.png)
+Every analysis is written to MongoDB, and the interface lists the five most recent ones.
 
 ### How it is built
 
-The backend is **FastAPI** behind **Uvicorn**, and every response shape is a **Pydantic**
-model, so the generated OpenAPI page is the API documentation itself, not a second
-description of it. The orchestration is
-**LangGraph**: a fixed sequence of nodes with one conditional edge, so the routing is a
-comparison between two integers and can be swept.
-The only **LangChain** dependency is the client that talks to an OpenAI-compatible endpoint,
-at the last node.
+The backend is **FastAPI** served by **Uvicorn**. Every route declares a **Pydantic** response
+model, and the OpenAPI page at `/docs` is generated from those models. The agent is a
+**LangGraph** graph of seven nodes with two conditional edges. The first ends the run on an
+invalid FEN. The second sends a position that is out of theory to the engine. The theory node
+makes that call by comparing a count of master games with a threshold, or by finding the
+position in the local book, and the routing study sweeps that threshold. **LangChain** appears
+only in the synthesis node, as the client for OpenAI-compatible endpoints.
 
-Retrieval is **sentence-transformers** over a multilingual model, which **PyTorch** runs on
-the CPU; the image points at the CPU-only wheels, which is the difference between a two-
-gigabyte image and a ten-gigabyte one. The vectors live in Milvus, the history in MongoDB, and the
-engine is a binary installed in the image and driven as a subprocess.
+Retrieval uses **sentence-transformers** with a multilingual model, which **PyTorch** runs on
+the CPU. The backend's dependency file points PyTorch at the CPU-only wheels. A comment in
+`backend/pyproject.toml` puts the resulting image at about 2 GB and the CUDA wheels it avoids at
+about 8 GB. Milvus stores the vectors and MongoDB the history. Stockfish is a binary installed in
+the image and driven as a subprocess.
 
-The interface is **Angular** with Material and `ngx-chess-board`, served by nginx, which
-proxies `/api/` to the backend. Dependencies are locked by **uv**; **pytest** runs three tiers
-of tests with warnings as errors, **Ruff** lints and formats, and **Bandit** scans the source
-whenever the pipeline is started.
+The interface is **Angular** with Angular Material and `ngx-chess-board`. It is served by nginx,
+which forwards `/api/` to the backend. **uv** locks the Python dependencies. **pytest** runs
+three tiers of tests and treats warnings as errors, **Ruff** checks linting and formatting, and
+**Bandit** scans the source. The CI workflow runs all three when someone starts it.
 
 ## The result
 
-### How the question is worded decides what comes back
+### Query wording and retrieval
 
-Retrieval is scored on 14 hand-written questions, each labelled with the set of articles that
-should come back. Four wordings were put to the same corpus and the same index:
+Retrieval is scored on 14 cases, one per opening. Each case gives the opening's name and ECO code
+and lists the articles that count as a correct answer. Every variant builds its query from that
+name, and the four variants were sent to the same corpus and the same index:
 
 <!-- source: backend/reports/ablation_retrieval.json -->
 
@@ -112,41 +116,51 @@ should come back. Four wordings were put to the same corpus and the same index:
 | `name-and-eco` (the name plus its ECO code) | 0.93 | 0.93 | 0.946 |
 > n = 14 cases, each with a hard label and no judge.
 
-> **How to read it.** Each row is one wording of the same question, put to the same corpus and
-> index; `name-and-eco` appends the position's ECO (Encyclopaedia of Chess Openings) code.
-> recall@1 is the share of the fourteen cases whose first result is a correct article, the
-> passage a player actually reads. recall@3 is the share where a correct article is among the
-> three the agent receives. MRR (mean reciprocal rank) averages one divided by the rank of the
-> first correct article, separating two wordings that find it at different depths. A gap
-> smaller than one case of fourteen is a single question changing its mind.
+> **How to read it.** Each row is one way of wording the query for the same fourteen openings,
+> sent to the same corpus and index. `name-and-eco` appends the ECO (Encyclopaedia of Chess
+> Openings) code to the name. recall@1 is the share of cases whose first result is a correct
+> article, which is the passage a player sees first. recall@3 is the share in which a correct
+> article is among the first three distinct articles retrieved; the agent itself receives three
+> passages, which can come from fewer articles. MRR (mean reciprocal rank) averages
+> 1/rank of the first correct article over the cases, so it separates two wordings that find the
+> article at different depths. On fourteen cases one case moves recall by 0.07, and a difference
+> of one case is a single case changing its result.
 
-**Padding the question hurts retrieval.** The verbose English wording drops recall@1 from 0.86
-to 0.50, which is five questions of the fourteen. Its generic words are the vocabulary every
-article of the corpus shares, so it pulls the most general pages to the top: asked about the
-Ruy Lopez it returns the King's Pawn article at rank 1 and the right article at rank 6.
+**The padded English wording loses five to six cases at the first rank.** Its recall@1 is 0.50,
+against 0.86 for the French wording and 0.93 for the two other wordings: five or six of the
+fourteen cases. In all seven cases it misses at rank 1, it returns the same article first,
+`wikichess/00045`, titled "King's pawn game" (the page for 1.e4 e5 2.Nf3 Nc6 3.Bc4). For the
+Ruy Lopez the first correct article comes at rank 6.
 
-**The French wording costs one case against the bare opening name,** which on fourteen cases
-is 0.07 of recall and therefore inside the floor this study declares. At that resolution the
-numbers only separate wide gaps. They show that the exact wording does not matter, and that
-keeping the opening name from being buried in generic words does.
+**The French wording scores one case below the bare opening name at the first rank.** On fourteen
+cases that difference is 0.07 of recall, the smallest one this study can show. The three short
+wordings are therefore not separated by the measurement. It does show that burying the opening
+name among generic words costs five to six cases at rank 1. The Italian Game case does not count
+`wikichess/00045`, the article on the position after 3.Bc4, among its correct answers, and all
+four wordings return that article first for this case.
 
-**These four rows are worse than the ones this repository published a week ago.** The
-screenshot at the top of this page exposed a product defect: what an article writes above its first sentence, four lines of codes and
-links, was reaching the player as though it were prose, and it was reaching the embedder too.
-Taking it out of the indexed text cost the served wording one case, and cost `name-and-eco`
-its perfect score, which had been 1.00 at every k.
+**Three of these four rows score lower at rank 1, and in MRR, than the first published version
+of this table.** That version was measured on 2026-09-07. Since then the header block that opens
+each article (its ECO code, its moves and, in a downloaded article, a FEN, a source URL and the
+contributors) has been removed from the indexed text. The current table was measured on
+2026-09-15 with the block already removed, and the change was committed on 2026-09-16
+(`5d5e3be`). A screenshot of the interface had shown that block reaching the player as if it
+were part of the passage, and it was also being embedded with the prose. The change cost the
+served French wording one case at rank 1, from 0.93 to 0.86, and took `name-and-eco` from 1.00
+to 0.93 at ranks 1 and 3. `name-only` is unchanged, and `english-verbose` lost a case at rank 1
+and gained one at rank 3.
 
-The perfect score came from a leak. The variant that appends an ECO code to the query was
-being matched against a chunk that contained the same ECO code, so its score measured a
-string match. `docs/protocol.md` says a question must never be drawn from the article it
-points at, for this reason; the codes in the text let the same failure in from the other
-side. The lower numbers measure retrieval.
+The earlier perfect score of `name-and-eco` came from a leak. Its query carried the ECO code,
+and so did the header of the article it was looking for, so the score measured a shared string.
+The case file states that no case was drawn from its target article, for the same reason. The
+numbers in the table are measured on text without the header.
 
-### The routing threshold sits on a plateau
+### Sensitivity of the routing threshold
 
-`theory_min_games` is the agent's only conditional edge, and the value it holds decides
-which half of the product a player meets. Two positions were looked at by hand when it was
-first set. Here is what it does across a frozen reading of 54 positions:
+`theory_min_games` is the number of master games from which the agent treats a position as
+theory. It decides whether a player gets the theory half of the product or the engine half. Its
+value was first chosen by looking at two positions by hand. The table applies it to a frozen
+reading of 54 positions:
 
 <!-- source: backend/reports/theory_threshold_sweep.csv -->
 
@@ -161,33 +175,40 @@ first set. Here is what it does across a frozen reading of 54 positions:
 | 25000 | 28 | 13 |
 > n = 54 positions, read from the `masters` database on 2026-09-07.
 
-> **How to read it.** Each row is one candidate value for `theory_min_games`, the number of
-> master games above which a position counts as theory. `in_theory` is how many of the 54 frozen
-> positions the agent would answer from master games at that setting. `flipped` counts the
-> positions that change side between a row and the one above it, so a row of zeros means the
-> value sits inside a plateau and the choice needs no further defence.
+> **How to read it.** Each row is one candidate value of `theory_min_games`. `in_theory` counts
+> the frozen positions that have at least one recorded move and at least that many master games,
+> which the agent answers from the Explorer when it has a token. `flipped` counts the positions
+> that change side against the previous value of the full sweep, published in
+> `backend/reports/theory_threshold_sweep.md`. That sweep also tests 0, 10, 50, 250 and 50 000, so
+> the 500 row is compared with 250. A zero means the routing did not change between the two values.
 
 <!-- source: backend/reports/figures/MANIFEST.json -->
-![How many of the 54 frozen positions the agent routes to theory as the threshold grows: a flat stretch with the served value inside it, then a fall at the high end. n = 54 positions](backend/reports/figures/routing_plateau.png)
+![How many of the 54 frozen positions count as theory as the threshold grows: a slow decline, a flat stretch that starts at the served value, then a fall at the high end. n = 54 positions](backend/reports/figures/routing_plateau.png)
 
-> **How to read it.** The horizontal axis carries the same thresholds as the table above, on a
-> logarithmic scale, so a tenfold rise takes the same width wherever it happens. The vertical
-> axis counts positions answered from master games. A flat stretch means the routing is
-> indifferent to the exact value picked inside it, and the dotted marker is the value the
-> service holds. The drop at the right is where raising the bar starts handing openings to the
-> engine.
+> **How to read it.** The horizontal axis carries all twelve values of the full sweep on a
+> symmetric-log scale: linear from 0 to 10 so that 0 can be placed, logarithmic above. The
+> vertical axis
+> counts the positions answered from master games. A flat stretch means the routing does not
+> depend on the exact value chosen inside it. The dotted line marks the value the service uses,
+> at the left end of the flat stretch that runs from 1 000 to 5 000. The drop at the right is
+> where a higher value starts removing main-line positions from the master-game answer.
 
-**Two positions of the 54 move when the value is divided by three, and none move when it is
-tripled.** The stretch from 500 to 5 000 is flat, and the served value sits inside it. So a
-number picked from two examples turns out to be safe, though the way it was picked had not
-earned that.
+Dividing the served value by three moves 2 of the 54 positions to the other side, and multiplying
+it by three moves none. On this reading no position has between 915 and 5 244 master games, so
+any value in that range gives the same routing. The value of 1 000 was chosen from two examples,
+and the sweep shows that it falls inside that stable range.
 
-The reading is committed with the day it was taken, because the Explorer is alive: its counts
-climb, and a sweep asking it again would answer something else.
+The sweep applies the Explorer rule alone. In the agent, a position below the threshold is also
+looked up in the local opening book, and it stays in theory when the book contains it. On these
+54 positions the book changes nothing up to 10 000. At 25 000 it would keep 37 positions in
+theory, nine more than the table shows. `docs/protocol.md` gives the details.
 
-### What a question costs
+The reading is committed with the date it was taken. The Explorer's counts grow as games are
+added, so a sweep that queried it again would produce different numbers.
 
-Measured inside the deployed configuration, four positions, three repeats:
+### Latency of each node
+
+Four positions were timed inside the deployed configuration, three times each:
 
 <!-- source: backend/reports/latency.json -->
 
@@ -201,164 +222,177 @@ Measured inside the deployed configuration, four positions, three repeats:
 > The engine is called at the depth `STOCKFISH_DEPTH` sets, fifteen plies in this configuration.
 
 > **How to read it.** One row per node of the agent's graph, timed inside the deployed
-> configuration. `median_ms` is the usual wait in milliseconds, the value half the calls beat.
-> `p90_ms` is the ninetieth percentile, meaning the slow call and never the usual one; a node
-> whose p90 sits far above its median will occasionally make the interface look broken. Twelve
-> timings name an order statistic and do not estimate one, which is why no interval is
-> published beside them.
+> configuration. `median_ms` is the typical wait in milliseconds: half the calls were faster.
+> `p90_ms` is the ninetieth percentile, taken as the tenth fastest of twelve calls (the fifth of
+> six for the engine), so it describes the slower calls. A wide gap between the two columns means
+> that some calls take much longer than usual. With so few timings no interval is published.
 
 <!-- source: backend/reports/figures/MANIFEST.json -->
 ![The four nodes of the graph on a logarithmic scale, each a median dot with a thick segment reaching its ninetieth percentile and a thin line continuing to its slowest call: the retrieval node is the quickest by a factor of four, and its own tail is the longest of the four. n = 12 timings per node, 6 for the engine](backend/reports/figures/latency_by_node.png)
 
-> **How to read it.** Each row is one node, on a logarithmic scale because the four span three
-> orders of magnitude. The dot is the median, the thick segment runs from there to the
-> ninetieth percentile, and the thin line continues to the slowest call recorded. A short thick
-> segment with a long thin tail marks a node that is usually quick and occasionally is not.
-> The language model is absent from this bench, and in a real request it dominates everything
-> drawn here.
+> **How to read it.** Each row is one node. The scale is logarithmic because the values drawn
+> run from 18 ms to more than 8 s. The dot is the median, the thick segment runs from the median
+> to the ninetieth percentile, and the thin line continues to the slowest call recorded. A short
+> thick segment followed by a long thin line marks a node that is usually fast and occasionally
+> slow. The language model is left out of this bench. In a real request it is expected to take
+> longer than any node drawn here; it was not timed.
 
-The retrieval, the part one worries about on a stack with a vector database, is the cheapest
-node by a factor of four. The cost of a request comes from the engine and YouTube, and the
-engine runs only once the position has left theory. The bench leaves the language model out:
-its call is billed, and one slow generation on a third-party endpoint would bury every local
-node. In a real request it is the dominant cost.
+The retrieval node, which embeds the query and searches Milvus, is the fastest: its median is
+about a quarter of the Explorer call's. In a typical request most of the time goes to the engine
+and to YouTube, with medians of 346 and 276 ms, and the engine runs only for positions out of
+theory. Over the whole bench, the single slowest search, 8.3 s, outweighs all the engine and
+YouTube calls together; the bench loads the embedding model inside its first search. The bench
+leaves out the synthesis node, because the model call is billed and one slow generation on a
+third-party endpoint would hide every local node. In a real request the model is expected to be
+the largest cost; it was not timed.
 
-### The model writes up; it does not choose
+### Moves cited by the language model
 
-One line of the prompt forbids inventing a move. Twenty-one positions were put to
-`gpt-4o-mini` twice each, 42 billed calls, covering both branches of the graph.
+One line of the system prompt forbids citing a move that was not given. Twenty-one positions
+were each put twice to `gpt-4o-mini`, 42 billed calls, covering both branches of the graph:
+twelve positions in theory and nine out of it.
 
 <!-- source: backend/reports/move_invention.json -->
 
 | Where a cited move came from | citations |
 |---|---|
-| Given in the prompt, by a tool | 68 |
+| Present in the prompt (tool output or the list of legal moves) | 68 |
 | The opening's own line, quoted behind its move number | 45 |
-| Legal in the position, not given by any tool | 1 |
+| Legal in the position, absent from the prompt | 1 |
 | No such move in the position | 2 |
 > n = 116 cited moves, over 21 positions answered twice.
 
-> **How to read it.** Each row is one origin a cited move can have, and `citations` counts the
-> moves that fall into it. The first two rows are moves a tool supplied or the opening's own
-> line quoted back. The last two are moves the model produced by itself, one playable in the
-> position and two that do not exist there. Only those bottom rows can break the claim the
-> interface rests on.
+> **How to read it.** Each row is one possible origin of a cited move, and `citations` counts the
+> moves with that origin. The first row holds moves present in the prompt, either in the output of
+> a tool or in the list of legal moves. The second holds moves of the opening's own sequence,
+> written after a move number. The last two rows hold moves the model produced by itself, one
+> legal in the position and two that cannot be played in it. The reader counts only those two rows
+> as departures from the instruction.
 
-**Not one move was made up.** Three citations fell outside what the prompt had given, and all
-three were read:
+**Three citations were neither in the prompt nor part of the opening's sequence.** Each of them
+was read by hand:
 
-- *Caro-Kann*, a plan named in passing, `e5`, legal in the position. This is the only case
-  where the model put forward a move no tool had handed it.
-- *Italian*, `a6`, a reply in a line not yet played: illegal *now* because it is Black's move
-  in a future position.
-- *Scholar's Attack*, `Qh5`, the move that created the position on the board. Correct, and
-  illegal now for the same reason.
+- *Caro-Kann*: `e5`, a plan mentioned in passing, legal in the position. It is the only move the
+  model proposed without the prompt containing it.
+- *Italian*: `a6`, Black's reply in a line not yet played. It is illegal in the current position
+  because White is to move.
+- *Scholar's Attack*: `Qh5`, the move that produced the position on the board. It is correct,
+  and illegal in the current position because it has already been played.
 
-The model's own wording of the three is quoted in
-[`backend/reports/move_invention.md`](backend/reports/move_invention.md), in French, which is
-the language it was asked to coach in.
+The model's own words for the three are quoted in
+[`backend/reports/move_invention.md`](backend/reports/move_invention.md), in French, the
+language it was asked to coach in.
 
-So the two flags for a move that does not exist are an artefact of judging every citation
-against the current board, when a coach talks about moves already played and moves that might
-be. The run establishes the claim the interface depends on: the moves come from the tools.
-Of 116 citations, 113 were either given in the prompt or part of the opening's own
-line.
+The two moves flagged as impossible therefore come from judging every citation against the
+current board, while a coach also talks about moves already played and moves to come. Of the 116
+citations, 113 were either present in the prompt or part of the opening's own sequence. Of the
+68 present in the prompt, 53 appear among the theoretical moves, the engine's move or the
+retrieved passages, and 15 appear only in the list of the position's first twelve legal moves,
+which the prompt also carries. The 45 moves of the opening's sequence are not checked. The run
+dates from 2026-09-08, before the header block was removed from the indexed text (commit
+`5d5e3be`, 2026-09-16). In 22 of the 42 prompts a retrieved passage still carried that header,
+with the opening's first moves, and 36 of the 45 come from answers to those prompts. The
+measurement therefore used a prompt that the service no longer produces.
 
 ## Why these numbers can be believed
 
-**The retrieval claim already existed, and had no artefact.** The docstring of
-`build_context_query` asserted that a short French question beats a padded English one, and
-the commit that introduced it said "verified on six openings". The ablation above confirms the
-observation and puts 36 points on it, but nothing in the repository recorded which six
-openings, what came back, or what was compared to what. Nobody could replay it, and
-nothing would have said when it stopped being true.
+**The retrieval study replaces a claim that had no record.** The docstring of
+`build_context_query` stated that a short French query beats a padded English one, from a check
+on the live index. The repository kept no record of which openings were tried or what came back,
+so the claim could not be replayed. The ablation above confirms it and puts the gap at 36 points
+of recall@1.
 
-**The evaluation questions are written by hand, never generated from their target.** A
-question drawn from the article it is supposed to retrieve measures string matching. The label
-is the file name, so the score needs no judge and costs nothing.
+**The cases were written by hand from the corpus index, and each label is a file name.** The case
+file records the rule: a case drawn from the text of its target article would measure string
+matching. Because the label is a file name, the score needs no judge and no billed call.
 
-**An opening can have more than one right article.** Three files cover the Ruy Lopez between
-them, so each case is labelled with all of them. Picking one of the three as the answer would
-mark a retrieval wrong for returning a different correct file.
+**An opening can have more than one correct article.** Three files cover the Ruy Lopez, so that
+case is labelled with all three. A label naming only one of them would mark a retrieval wrong
+when it returned another correct file.
 
-**Fragments of one article count once.** An article enters the index in pieces, and a single
-opening could otherwise hold every slot of a top three. Left uncollapsed, the score rises at
-every k for a reason that belongs to the chunker.
+**Fragments of one article count once.** An article is indexed as several chunks, and one opening
+could otherwise fill the whole top three. The ranking is reduced to distinct files before the
+cut at k, which keeps the chunking from raising the score at every k.
 
-**Warnings are errors.** The test configuration used to silence three whole categories of
-warning on a stack made of six libraries that move fast. Switching to
-`filterwarnings = ["error"]` surfaced one on the first run, and the deprecation was followed
-instead of being silenced again.
+**Warnings are errors.** The test configuration used to ignore three whole categories of warning
+(DeprecationWarning, PendingDeprecationWarning and UserWarning), on a stack built from six
+libraries that change quickly. After the switch to `filterwarnings = ["error"]`, the first run
+surfaced one deprecation, from the Starlette test client. The fix installed `httpx2`, the client
+that test client asks for, and added no filter.
 
-**The parser accused the model before it was right itself.** Ten citations came back as
-non-existent moves and not one of the ten was: they were second moves of narrated lines,
-squares named as places, and first moves quoted from an opening's history.
-[`docs/protocol.md`](docs/protocol.md) says what each shape was and how it is now tested. The
-table above comes from a later run, so the parser is not being marked on its own homework,
-and the counts a stricter parser would produce are published next to it.
+**The citation reader handles three shapes that would otherwise look like invented moves.**
+Second moves of narrated lines, squares named as places, and first moves quoted from an
+opening's history each have a unit test in `backend/tests/unit/evaluation/test_eval_moves.py`,
+and [`docs/protocol.md`](docs/protocol.md) describes them. `backend/reports/move_invention.md`
+also gives the counts obtained when every square-looking token is read as a move.
 
-**No test touches the network.** Every external service is faked, and the three tiers are separated
-by what they are allowed to touch: `backend/tests/unit/` forbids a socket outright,
-`backend/tests/integration/` wires two real components together, and
-`backend/tests/system/` starts the API as a process with none of its six services behind it,
-which is the tier that found the twenty-second search and the model loaded inside the first
-request.
+**The tests replace the external services.** The unit and integration tiers replace Lichess,
+YouTube, Milvus and MongoDB with fakes, and run without a language model. The three tiers differ
+in what they may touch. `backend/tests/unit/` refuses any connection to a host other than the
+local machine. `backend/tests/integration/` wires two real components together.
+`backend/tests/system/` starts the API as a separate process, points Milvus at a closed local
+port and empties the Lichess, YouTube and model keys. That process reads the embedding model
+from the local Hugging Face cache only (`HF_HUB_OFFLINE=1`). With an empty cache the model cannot
+be loaded, and the search route answers 503 as it does when Milvus is closed. The system tier
+was added in the same change that applied the three-second Milvus timeout and added the
+loading of the embedding model at start-up.
 
-Three tests guard the evaluation itself: that no case points at an article the corpus cannot
-hold, that the `french-question` variant calls the agent's own function rather than a copy of
-it, and that raising the threshold never puts *more* positions into theory.
+Three tests check the evaluation itself: that every label names an article of the corpus, that
+the `french-question` variant returns what the agent's own function returns, and that raising
+the threshold never adds positions to theory. Another test judges the 42 saved answers of the
+move-invention check again and compares the totals with the published table.
 
 ## Running it
 
-Docker Desktop must be running. [`docs/operations.md`](docs/operations.md) carries the rest of
-it: the order things come up in, which routes work before the others, and where to look when
-the interface goes quiet.
+Docker Desktop must be running. [`docs/operations.md`](docs/operations.md) covers the rest: the
+order in which the services start, which routes work before the others, and what to check when
+the interface stops answering.
 
 ```powershell
 copy .env.example .env       # optional keys: Lichess, YouTube, a language model
 docker compose up -d --build
 
-# download the Wikichess articles, which are not redistributed here
+# download the Wikichess articles, which git does not track
 docker compose run --rm backend python -m scripts.fetch_wikichess
 
-# load the knowledge base into Milvus, once — the volume keeps it
+# load the knowledge base into Milvus once; the volume keeps it
 docker compose run --rm backend python -m scripts.ingest_wikichess
 ```
 
 - Interface: <http://localhost:4200>
 - API documentation: <http://localhost:8000/docs>
 
-None of the three keys is required. Without them the book answers in place of the Explorer,
-the template writes in place of the model, and no video is proposed.
+None of the three keys is required. Without them the local book answers in place of the
+Explorer, the template writes in place of the model, and no video is proposed.
 
-The measurements are reproduced from [`docs/protocol.md`](docs/protocol.md), which says for
-each one what it can and cannot separate. Checks: `uv run pytest` from `backend/`,
-`uv run ruff check .`, `uv run bandit -c pyproject.toml -r src`, and
-`npm test -- --watch=false --browsers=ChromeHeadless` in `frontend/`.
+[`docs/protocol.md`](docs/protocol.md) gives the command that reproduces each measurement and
+says what each design can and cannot separate. The checks are `uv run pytest`,
+`uv run ruff check .` and `uv run bandit -c pyproject.toml -r src` from `backend/`, and
+`npm test -- --watch=false --browsers=ChromeHeadless` from `frontend/`.
 
-Eight routes, documented by the generated OpenAPI schema:
+The API has eight routes, documented on the generated OpenAPI page:
 
 <!-- source: docs/images/MANIFEST.json -->
-![The generated OpenAPI page listing the eight routes with their request and response shapes, built from the Pydantic models rather than written by hand](docs/images/api-docs.png)
+![The generated OpenAPI page of the Chess Coach API: seven of its routes, each collapsed to its method, path and summary, with the history section cut off at the bottom](docs/images/api-docs.png)
 
 ## Structure
 
 ```
 ├── backend/                  README: the API and its measurement scripts
 │   ├── data/
-│   │   ├── openings/         11 notes written in French, the local opening book's prose
+│   │   ├── openings/         11 notes written in French, indexed beside the Wikichess articles
 │   │   └── eval/             the frozen inputs of the measurements
 │   ├── notebooks/            the walkthrough, from a FEN to the agent's prompt
-│   ├── reports/              what the measurement scripts publish, and the run evidence
-│   ├── scripts/              ingestion, the four measurement scripts, the smoke run
+│   ├── reports/              the measurement results, the figures and the run evidence
+│   ├── scripts/              download, ingestion, measurements, figures, the smoke run
 │   ├── src/chess_coach/
 │   │   ├── agent/            LangGraph state, nodes, graph, synthesis
 │   │   ├── api/              routes, schemas, and the mapping between them
-│   │   ├── evaluation/       the metrics, the query variants, the threshold sweep
+│   │   ├── evaluation/       the metrics, the query variants, the sweep, the citation reader
 │   │   ├── rag/              chunking and indexing
 │   │   ├── services/         Lichess, Stockfish, YouTube, Milvus, MongoDB, the opening book
-│   │   ├── utils/paths.py    every path of the project, resolved once
-│   │   └── config.py         every tunable, read from the environment
+│   │   ├── utils/paths.py    every path of the project, resolved in one place
+│   │   └── config.py         every setting, read from the environment
 │   ├── tests/                unit, integration and system
 │   └── var/                  what a run leaves behind, including the downloaded corpus
 ├── frontend/                 README: the Angular interface
@@ -366,60 +400,72 @@ Eight routes, documented by the generated OpenAPI schema:
 └── docker-compose.yml        the six services
 ```
 
-[`docs/architecture.md`](docs/architecture.md) has the six containers, the graph and what
-falls over when a key is missing, including the four designs that were considered and left
-out. The two secondary READMEs are [`backend/README.md`](backend/README.md) and
-[`frontend/README.md`](frontend/README.md). The study that is not built is
-[`docs/feasibility_video_analysis.md`](docs/feasibility_video_analysis.md), and
-[`metrics.yaml`](metrics.yaml) defines every label used in a table above.
+[`docs/architecture.md`](docs/architecture.md) describes the six containers, the graph, how each
+service behaves when it fails, and four designs that were considered and not built. The two
+other READMEs are [`backend/README.md`](backend/README.md) and
+[`frontend/README.md`](frontend/README.md).
+[`docs/feasibility_video_analysis.md`](docs/feasibility_video_analysis.md) is a study of a
+video-analysis module that has not been built, and [`metrics.yaml`](metrics.yaml) defines each
+numeric column of the tables above.
 
 ## What this does not prove
 
-**Fourteen questions is a small set.** One question is worth 0.07 of recall, so the ablation
-separates a wide gap from a narrow one and nothing finer. It establishes that padding the
-query costs five questions; it does not rank the three variants that scored within one case of
-each other.
+**Fourteen cases is a small set.** One case is worth 0.07 of recall, so the ablation can only
+separate wide gaps. It shows that padding the query costs five to six cases at rank 1, and it
+does not rank the three wordings that scored within one case of each other.
 
-**Thirty-two articles is a small corpus.** On a base this size the right answer is often
-within reach, and a high recall@3 says more about the corpus than about the retrieval. What
-remains measurable is the sensitivity to how the question is worded.
+**Thirty-two articles is a small corpus.** With so few articles a correct one is often within
+reach, and a high recall@3 reflects the corpus as much as the retrieval. The effect of the
+query's wording remains measurable.
 
 **One model, forty-two answers.** The invention check ran on `gpt-4o-mini` at temperature 0.3,
 twice over twenty-one positions. Another model, or a longer answer, could behave differently.
-It stays a script and not a test because every run of it is billed.
+The check is a script, kept out of the test suite because each fresh run is billed.
 
-**The other half of the instruction is unchecked.** The model is also told to stay silent
-about the engine unless an evaluation was supplied. No count exists for that, and producing
-one would take a reader built for a different question.
+**The second half of the instruction is unchecked.** The model is also told to mention the engine
+only when an evaluation was supplied. Nothing counts how often it follows that rule, and counting
+it would need a reader built for that question.
 
-**The history the model tells is not verified.** Forty-five of the citations are an opening's
-own line, quoted behind its move number. That the line is the *right* one is not checked: the
-frozen reading holds positions, not the move orders that reach them.
+**The opening sequences the model quotes are not verified.** Forty-five citations are moves of an
+opening's own sequence, written after a move number. Whether the sequence is the right one is
+not checked, because the frozen reading stores positions and the move orders that reach them are
+not recorded.
 
-**The corpus is taken as it comes.** The Wikichess articles are indexed with their source and
-their contributors, and this repository measures which one is returned, not whether what it
-says is right.
+**The corpus is used as published.** The Wikichess articles are indexed without their header
+block, and each downloaded file keeps its source URL and the names of its contributors. The
+repository measures which article is returned. Whether the article's content is correct is
+outside its scope.
 
-**Nothing measures the quality of the written answer.** It would take a judge, and a judge's
-score says more about the judge than about the answer.
+**The quality of the written answer is not measured.** Measuring it would take a judge, and a
+judge's score depends on the judge as much as on the answer.
 
-**Nothing here has been deployed.** Six containers on one machine, with localhost ports.
-`docs/operations.md` says what a deployment would need and what this stack already carries.
+**Nothing here has been deployed.** The stack is six containers on one machine, reached on
+localhost ports. `docs/operations.md` lists what a deployment would need and what the stack
+already provides.
 
 ## Licence and data
 
-Code under [MIT](LICENSE). Where every source comes from, and what its terms allow, is in
-[`docs/data-source.md`](docs/data-source.md).
+Code under [MIT](LICENSE). [`docs/data-source.md`](docs/data-source.md) describes where each
+source comes from and what its terms allow.
 
-**No third-party data is redistributed.** Twenty-one of the thirty-two articles come from
-[Wikichess](https://ficgs.com/wikichess.html), whose terms let a visitor copy games and
-nothing else; `docs/data-source.md` quotes the clause. Those articles are therefore absent
-from this repository. Present instead:
-[`backend/reports/wikichess_manifest.json`](backend/reports/wikichess_manifest.json), naming
+Twenty-one of the thirty-two articles come from [Wikichess](https://ficgs.com/wikichess.html),
+whose terms reserve the text of the site and allow copying games only. `docs/data-source.md`
+quotes the clause. The article files are therefore not tracked by git. The repository tracks
+[`backend/reports/wikichess_manifest.json`](backend/reports/wikichess_manifest.json), which names
 each article and the page it was read from, and `backend/scripts/fetch_wikichess.py`, which
-fetches them into a directory git ignores. The eleven French notes were written here.
+downloads the articles into a directory git ignores. The eleven French notes were written for
+this repository.
 
-The Lichess Opening Explorer, Stockfish and the YouTube Data API are called at run time, each
-under its own terms, and no key is shipped. What sits under `backend/reports/` is derived
-numbers, with one exception: the frozen Explorer reading, which records how many public games
-reached each position on a stated day.
+Beyond the titles, ECO codes, opening moves and addresses listed in that manifest, the repository
+publishes no text from the Wikichess articles. The 42 prompts saved by the move-invention check
+keep, in place of each Wikichess passage, the identifier of its chunk and the moves the citation
+reader found in it, and judging the answers again counts those moves as given. Earlier versions
+of that file, of the walkthrough notebook and of a screenshot since removed show Wikichess
+passages or article headers. Those versions remain in the git history.
+
+The Lichess Opening Explorer and the YouTube Data API are called at run time under their own
+terms, Stockfish is installed in the backend image, and no key is shipped. The frozen Explorer
+reading, in `backend/data/eval/theory_positions.json`, records how many master games reached each
+position on 2026-09-07.
+
+</div>

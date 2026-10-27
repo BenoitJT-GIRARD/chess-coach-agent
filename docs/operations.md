@@ -1,8 +1,8 @@
 # Running it
 
-One command starts six containers, and the stack answers before all six are useful. This page
-covers the gap between answering and being useful: what is up, what is merely running,
-what each missing key costs, and what to look at when an answer stops arriving.
+One command starts six containers, and the API answers before all of them are ready. This page
+covers that interval: what is running, what is ready, what each missing key changes, and what to
+check when an answer stops arriving.
 
 ## Starting it
 
@@ -10,10 +10,10 @@ what each missing key costs, and what to look at when an answer stops arriving.
 copy .env.example .env       # every key in it is optional
 docker compose up -d --build
 
-# the articles are not redistributed; this downloads them into backend/var/
+# the articles are not tracked by git; this downloads them into backend/var/
 docker compose run --rm backend python -m scripts.fetch_wikichess
 
-# index them into Milvus, once. The named volume keeps the collection
+# index them into Milvus once; the named volume keeps the collection
 docker compose run --rm backend python -m scripts.ingest_wikichess
 ```
 
@@ -24,108 +24,120 @@ docker compose run --rm backend python -m scripts.ingest_wikichess
 | Liveness probe | <http://localhost:8000/api/v1/healthcheck> |
 | Milvus health | <http://localhost:9091/healthz> |
 
-**Milvus is the slow one.** It waits for etcd and MinIO, and its own healthcheck is given a
-ninety-second grace period before Compose starts counting failures. The backend waits for it,
-the frontend waits for the backend, so `docker compose up` is quiet for a while and then
-everything appears at once. A stack that looks stuck two minutes in is usually Milvus still
-starting.
+**Milvus takes the longest to start.** It waits until etcd and MinIO are healthy, and its own
+healthcheck has a ninety-second start period during which Compose does not count failures. The
+backend waits until Milvus and MongoDB are healthy, and the frontend waits for the backend. As a
+result `docker compose up` shows little activity for a while, and then the services appear
+together. A stack that looks stuck two minutes after the start is usually waiting for Milvus.
 
-## What is up, and what is ready
+## Liveness and readiness
 
-The service answers `/api/v1/healthcheck` as soon as uvicorn binds its port. That is liveness,
-and it is what the container healthcheck and the frontend probe. Readiness is another matter,
-and it differs from route to route:
+The service answers `/api/v1/healthcheck` as soon as uvicorn has bound its port. That route is
+the liveness probe: the healthcheck of the backend image calls it, and Compose starts the
+frontend only once that healthcheck passes. Readiness differs from one route to the next:
 
 | Route | Works with nothing behind it |
 |---|---|
 | `/api/v1/healthcheck` | yes |
-| `/api/v1/position/{fen}` | yes, the board is arithmetic |
+| `/api/v1/position/{fen}` | yes, the description of the board is pure computation |
 | `/api/v1/moves/{fen}` | yes, from the local opening book |
 | `/api/v1/evaluate/{fen}` | needs the Stockfish binary, which is in the image |
-| `/api/v1/vector-search` | needs Milvus, and a collection that has been ingested |
-| `/api/v1/videos/{opening}` | needs a YouTube key; answers with an empty list otherwise |
-| `/api/v1/agent` | answers, degraded, whatever is missing |
+| `/api/v1/vector-search` | needs the embedding model, Milvus, and a collection that has been ingested |
+| `/api/v1/videos/{opening}` | needs a YouTube key; answers 503 without one |
+| `/api/v1/agent` | answers, with fewer sources, when a key, Milvus, MongoDB, Stockfish or the embedding model is missing |
 | `/api/v1/history` | needs MongoDB; answers with an empty history otherwise |
 
-**The embedding model is loaded at startup, in a background thread.** It used to load inside
-the first request that needed one, which cost that request ten seconds on a warm cache and a
-few hundred megabytes of download on a cold one. The service now starts, answers its probe,
-and logs `Embedding model ready` when the first search will be fast. Until that line appears, a
-search is slow but still works.
+**The embedding model is loaded at startup, in a background thread.** When the load succeeds the
+service logs `Embedding model ready`, and when it fails it logs `Embedding model not warmed up`
+with the reason. The process keeps the loaded model, and the agent and `/api/v1/vector-search`
+both use that copy. A search that arrives while the load is still running waits for it to finish.
+After a failed load, the next search tries again. While the model cannot be loaded, the agent
+answers without passages and `/api/v1/vector-search` answers 503. Before this warm-up existed, the
+first request that needed the model paid for the whole load: about ten seconds on a warm cache,
+and a download of a few hundred megabytes on a cold one.
 
-## What each missing key costs
+## What each missing key changes
 
-Everything works without a single key. What changes is which source answers.
+Everything works without any key. A missing key changes which source answers.
 
 | Missing | What happens |
 |---|---|
-| `LICHESS_TOKEN` | the Explorer refuses the call and the local opening book answers; eleven openings instead of the master database |
-| `YOUTUBE_API_KEY` | the videos panel stays empty, and the agent does not claim otherwise |
+| `LICHESS_TOKEN` | the Explorer is not called, and the local opening book answers; the book holds seventeen lines, where the Explorer covers the whole master database |
+| `YOUTUBE_API_KEY` | the video section stays empty, and neither the template nor the model's prompt mentions videos |
 | `LLM_API_KEY`, or `LLM_ENABLED=false` | a deterministic French template writes the recommendation from the same facts |
-| the Wikichess download | the retrieval answers from the eleven written notes alone, and `scripts/ingest_wikichess` refuses to index a third of a corpus |
+| the Wikichess download | `scripts.ingest_wikichess` refuses to run, and the agent answers without passages until the articles are downloaded and indexed |
 
-The ingestion refuses on purpose, because an index built on a third of the corpus answers
-every question plausibly and scores a third of what `docs/protocol.md` publishes. The ingestion
-reads the manifest, sees that none of the articles it lists is on disk, and names the command
-that fetches them.
+The YouTube and model keys are empty in `.env.example`, so a copy of it runs the stack without
+them until they are filled in.
 
-## Getting the keys back
+The ingestion refuses on purpose. An index built from the eleven notes alone would answer every
+question plausibly, while describing a different corpus from the one `docs/protocol.md`
+measures. When the Wikichess folder holds no article, the ingestion stops and names the command
+that downloads the articles.
 
-Each key is personal and is created in a minute; none of them is shared with the repository.
+## Getting the keys
+
+Each key is personal, and the repository ships none.
 
 | Key | Issuer | Creating one |
 |---|---|---|
-| `LICHESS_TOKEN` | Lichess | [lichess.org/account/oauth/token/create](https://lichess.org/account/oauth/token/create), with no scope ticked: the Explorer only needs to know who asks |
+| `LICHESS_TOKEN` | Lichess | [lichess.org/account/oauth/token/create](https://lichess.org/account/oauth/token/create), with no scope ticked: the Explorer only needs to know who is asking |
 | `YOUTUBE_API_KEY` | Google Cloud | in a project of your own, enable *YouTube Data API v3*, then *Credentials*, *Create credentials*, *API key*, restricted to that API |
 | `LLM_API_KEY` | OpenAI, or any OpenAI-compatible provider | [platform.openai.com/api-keys](https://platform.openai.com/api-keys), a project key; the account needs credit on its balance |
 
-All three go in `.env` at the root, copied from `.env.example`, which `docker compose` hands
-to the API container. Once the demonstration is over, delete each one on the page that
-created it: an idle key that still opens an account is a risk for nothing.
+All three go in the `.env` file at the root, copied from `.env.example`, and Docker Compose
+passes that file to the API container. When the demonstration is over, delete each key on the
+page that created it, so that no unused key can still reach an account.
 
 ## When something stops answering
 
-**A search that hangs.** Look at `docker compose logs milvus`. A call to the vector store is
-given three seconds (`MILVUS_TIMEOUT`); beyond that the route answers `503` with the address it
-tried. Without that deadline pymilvus retries a closed port for about ten seconds, which a
-reader experiences as a page that has stopped working.
+**A search hangs.** Check `docker compose logs milvus`. Each call to the vector store is allowed
+three seconds (`MILVUS_TIMEOUT`). After that the route answers 503, and the message gives the
+Milvus address when the connection itself failed. Without that limit, according to a comment in
+`config.py`, pymilvus keeps retrying a closed port for about ten seconds. A search sent while the
+embedding model is still loading at start-up also waits for that load.
 
-**A search that answers nothing.** The collection is empty: the container came up, the volume
-is new, and nobody has run the ingestion. `docker compose run --rm backend python -m
-scripts.ingest_wikichess` prints how many articles each folder held, which is the fastest way
-to see that one of them held none.
+**The interface shows no passage.** Either the collection has not been created, because the
+volume is new and the ingestion has not run, or the embedding model could not be loaded, which
+the backend log reports as `Embedding model not warmed up`. The agent then answers without
+passages, and `/api/v1/vector-search` answers 503. `docker compose run --rm backend python -m scripts.ingest_wikichess` creates the
+collection and prints how many articles it found in each folder.
 
-**The history stays empty.** Persistence is best effort by design: a MongoDB outage logs a
-warning and never costs the player an answer. Check `docker compose logs backend` for
-`Could not persist interaction to MongoDB`.
+**The history stays empty.** Persistence is best effort. When MongoDB is unavailable the backend
+logs a warning, and the player still gets an answer. Look for
+`Could not persist interaction to MongoDB` in `docker compose logs backend`.
 
-**The coach says a position is out of theory when it is not.** Two causes, and the logs
-separate them: no Lichess token, so the local book answered and it holds eleven openings; or
-the position genuinely has fewer than `THEORY_MIN_GAMES` master games. `docs/protocol.md`
-sweeps that threshold and says how much of the repertoire each value moves.
+**The coach says a position is out of theory when it is not.** There are two possible causes.
+With no Lichess token, or when the Explorer call fails, only the local book answers, and it holds
+seventeen lines. Otherwise the position has fewer than `THEORY_MIN_GAMES` master games. The panel
+tells the two cases apart: when the Explorer answered with at least one game, the panel shows how
+many master games reached the position. `docs/protocol.md` sweeps the threshold and reports how
+many positions each value moves.
 
-**The interface shows nothing at all.** nginx serves the built Angular application and proxies
-`/api/` to the backend. If the page loads and every panel is empty, the proxy is the suspect:
-`docker compose logs frontend`.
+**The interface cannot reach the agent.** nginx serves the built Angular application and
+forwards `/api/` to the backend. If the page loads and the panel says it cannot contact the
+agent, check the proxy and the backend with `docker compose logs frontend` and
+`docker compose logs backend`.
 
 ## Restarting, and what survives
 
 Five named volumes hold the state: `milvus_data`, `etcd_data` and `minio_data` for the vector
-store, `mongo_data` for the history, `hf_cache` for the downloaded embedding model. A
-`docker compose restart` keeps all five, so the demonstration comes back without re-ingesting
-anything.
+store, `mongo_data` for the history, and `hf_cache` for the downloaded embedding model.
+`docker compose restart` keeps all five, so the demonstration comes back without a new
+ingestion.
 
-`docker compose down -v` removes them, and then the corpus has to be ingested again. The
-downloaded articles themselves survive, because they live on the host under `backend/var/` and
-are mounted into the container.
+`docker compose down -v` removes them. The corpus then has to be ingested again, and the
+embedding model downloaded again. The downloaded articles stay, because they live on the host
+under `backend/var/wikichess/`, which is mounted into the container.
 
-## What is not here
+## Deployment
 
-No deployment. This stack runs on one machine, with `docker compose`, and every address above
-is a localhost port. There is no orchestration manifest, no ingress, no secret manager and no
-horizontal scaling, because none of them was ever exercised, and a Kubernetes chart that has
-never run would assert something nobody has tested.
+The stack has not been deployed. It runs on one machine with Docker Compose, and every address
+above is a localhost port. The repository has no orchestration manifest, ingress, secret manager
+or horizontal scaling. None of these was ever exercised, and an orchestration manifest that had
+not been run would document an untested deployment.
 
-What the stack does carry is the part a deployment would need first: a liveness probe, a
-healthcheck in the image, dependency ordering between the six services, a non-root user, and
-every setting behind an environment variable.
+The stack does include the parts a deployment would need first: a liveness probe, a healthcheck
+and a non-root user in each of the two images the repository builds, healthchecks for the four
+other services in `docker-compose.yml`, a start-up order between the six services, and every
+setting read from an environment variable.

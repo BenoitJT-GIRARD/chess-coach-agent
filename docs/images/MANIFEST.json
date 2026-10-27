@@ -34,30 +34,8 @@
       "device_scale_factor": 2,
       "app_state": "the six containers up through `docker compose up -d --build`, the Wikichess corpus downloaded and ingested into Milvus, and a Lichess token, a YouTube key and a language model key present in .env, the board set to the Ruy Lopez after 3.Bb5 from the demo row",
       "data_source": "own",
-      "demonstrates_behaviour": "the nominal answer, at the top of the panel where a reader lands: the opening named with its ECO code, the summary, the move most played in master games with its count, the theoretical moves and the reference games. The retrieved passage is below the fold here and visible in the twin capture",
+      "demonstrates_behaviour": "the nominal answer, at the top of the panel where a reader lands: the opening named with its ECO code, the summary, the move most played in master games with its count, the theoretical moves and the reference games. The retrieved passage starts at the bottom edge of the frame",
       "git_revision": "61c91f5f4c38b2fa8e79acbd0dcde021bcf964e3",
-      "paired_with": "coach-out-of-theory.png",
-      "depends_on": [
-        "../frontend/src/app/coach/coach-panel.component.html",
-        "src/chess_coach/agent/graph.py"
-      ]
-    },
-    "coach-out-of-theory.png": {
-      "sha256": "baf71903a3729e0f0e3d9ce0cb98fd2c4a14a1389fc9bebf5717692172de60b0",
-      "written": "2026-09-15",
-      "source": "scripts/capture.py",
-      "command": "uv run python scripts/capture.py --only coach-out-of-theory",
-      "target": "http://127.0.0.1:4200/",
-      "viewport": [
-        1280,
-        1000
-      ],
-      "device_scale_factor": 2,
-      "app_state": "the six containers up through `docker compose up -d --build`, the Wikichess corpus downloaded and ingested into Milvus, and a Lichess token, a YouTube key and a language model key present in .env, the board set to 1.e4 e5 2.Qh5 from the demo row",
-      "data_source": "own",
-      "demonstrates_behaviour": "the same screen one branch later: the master database does not reach this position, so the theory panel says so and the engine evaluation takes its place, which is the branch the routing threshold decides",
-      "git_revision": "61c91f5f4c38b2fa8e79acbd0dcde021bcf964e3",
-      "paired_with": "coach-in-theory.png",
       "depends_on": [
         "../frontend/src/app/coach/coach-panel.component.html",
         "src/chess_coach/agent/graph.py"
