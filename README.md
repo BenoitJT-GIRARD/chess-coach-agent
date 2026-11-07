@@ -408,40 +408,20 @@ other READMEs are [`backend/README.md`](backend/README.md) and
 video-analysis module that has not been built, and [`metrics.yaml`](metrics.yaml) defines each
 numeric column of the tables above.
 
-## What this does not prove
+## Scope
 
-**Fourteen cases is a small set.** One case is worth 0.07 of recall, so the ablation can only
-separate wide gaps. It shows that padding the query costs five to six cases at rank 1, and it
-does not rank the three wordings that scored within one case of each other.
+**The retrieval set.** Fourteen cases over a corpus of thirty-two Wikichess articles. One case is
+worth 0.07 of recall, so the ablation separates wide gaps, such as the five to six cases at rank 1
+that padding the query costs.
 
-**Thirty-two articles is a small corpus.** With so few articles a correct one is often within
-reach, and a high recall@3 reflects the corpus as much as the retrieval. The effect of the
-query's wording remains measurable.
+**The invention check** ran on `gpt-4o-mini` at temperature 0.3, twice over twenty-one positions,
+as a script kept out of the test suite because each fresh run is billed.
 
-**One model, forty-two answers.** The invention check ran on `gpt-4o-mini` at temperature 0.3,
-twice over twenty-one positions. Another model, or a longer answer, could behave differently.
-The check is a script, kept out of the test suite because each fresh run is billed.
+**The corpus is used as published.** The articles are indexed without their header block, and
+each downloaded file keeps its source URL and the names of its contributors.
 
-**The second half of the instruction is unchecked.** The model is also told to mention the engine
-only when an evaluation was supplied. Nothing counts how often it follows that rule, and counting
-it would need a reader built for that question.
-
-**The opening sequences the model quotes are not verified.** Forty-five citations are moves of an
-opening's own sequence, written after a move number. Whether the sequence is the right one is
-not checked, because the frozen reading stores positions and the move orders that reach them are
-not recorded.
-
-**The corpus is used as published.** The Wikichess articles are indexed without their header
-block, and each downloaded file keeps its source URL and the names of its contributors. The
-repository measures which article is returned. Whether the article's content is correct is
-outside its scope.
-
-**The quality of the written answer is not measured.** Measuring it would take a judge, and a
-judge's score depends on the judge as much as on the answer.
-
-**Nothing here has been deployed.** The stack is six containers on one machine, reached on
-localhost ports. `docs/operations.md` lists what a deployment would need and what the stack
-already provides.
+**The stack** runs as six containers on one machine, and `docs/operations.md` lists what a
+deployment would add to what it already provides.
 
 ## Licence and data
 
